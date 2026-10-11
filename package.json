@@ -1,0 +1,12 @@
+{
+  "name": "piggy-game",
+  "version": "1.0.0",
+  "description": "Piggy Escape: Farmer Chase - 2.5D Voxel Browser Game",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": ["game", "phaser", "voxel", "isometric", "piggy"],
+  "author": "",
+  "license": "ISC"
+}
