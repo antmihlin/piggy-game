@@ -1,5 +1,5 @@
-// MenuScene: Displays the new voxel artwork background, pixelated level selector,
-// 3-tier difficulty selector (Easy, Normal, Hard), and chunky pixel arcade buttons.
+// MenuScene: Displays the clean voxel artwork background, animated 3D pixel title logo,
+// pixelated level selector, 3-tier difficulty selector (Easy, Normal, Hard), and chunky arcade buttons.
 
 class MenuScene extends Phaser.Scene {
   constructor() {
@@ -21,7 +21,7 @@ class MenuScene extends Phaser.Scene {
     bg.fillGradientStyle(0x2d112c, 0x2d112c, 0xf39c12, 0xd35400, 1);
     bg.fillRect(0, 0, width, height);
 
-    // New Menu Artwork (from user upload menu_bg_v2.jpg)
+    // Clean Menu Artwork (from user upload)
     if (this.textures.exists('menu_bg_v2')) {
       const splash = this.add.image(width / 2, height / 2, 'menu_bg_v2');
       const scale = Math.max(width / splash.width, height / splash.height);
@@ -31,15 +31,69 @@ class MenuScene extends Phaser.Scene {
       splash.setScale(Math.min(width * 0.8 / splash.width, height * 0.45 / splash.height));
     }
 
-    // Semi-translucent dark pixelated backing panel for lower controls to guarantee contrast & readability
+    // Gentle bottom gradient shadow to make lower pixel buttons and level bar pop with high contrast
     const lowerBacking = this.add.graphics();
-    lowerBacking.fillStyle(0x0c1014, 0.55);
-    lowerBacking.fillRect(width * 0.08, height * 0.50, width * 0.84, height * 0.46);
+    lowerBacking.fillGradientStyle(0x000000, 0x000000, 0x0a1017, 0x0a1017, 0, 0, 0.6, 0.6);
+    lowerBacking.fillRect(0, height * 0.48, width, height * 0.52);
+
+    // ==========================================
+    // 0. ANIMATED 3D PIXEL TITLE LOGO
+    // ==========================================
+    const titleContainer = this.add.container(width / 2, height * 0.13);
+
+    // Title base / extrusion shadow
+    const titleShadow = this.add.text(0, 5, 'PIGGY ESCAPE', {
+      fontFamily: '"Press Start 2P", monospace',
+      fontSize: Math.min(width * 0.048, 38) + 'px',
+      color: '#1e272e',
+      stroke: '#0c1014',
+      strokeThickness: 8
+    }).setOrigin(0.5);
+    titleContainer.add(titleShadow);
+
+    // Title main face
+    const titleMain = this.add.text(0, 0, 'PIGGY ESCAPE', {
+      fontFamily: '"Press Start 2P", monospace',
+      fontSize: Math.min(width * 0.048, 38) + 'px',
+      color: '#ff4757',
+      stroke: '#2f3542',
+      strokeThickness: 6
+    }).setOrigin(0.5);
+    titleContainer.add(titleMain);
+
+    // Highlight text overlay for 3D retro arcade pop
+    const titleHighlight = this.add.text(-2, -2, 'PIGGY ESCAPE', {
+      fontFamily: '"Press Start 2P", monospace',
+      fontSize: Math.min(width * 0.048, 38) + 'px',
+      color: '#ff6b81'
+    }).setOrigin(0.5);
+    titleContainer.add(titleHighlight);
+
+    // Subtitle Ribbon
+    const subTitle = this.add.text(0, 36, 'FARMER CHASE: VOXEL EDITION', {
+      fontFamily: '"Press Start 2P", monospace',
+      fontSize: Math.min(width * 0.016, 12) + 'px',
+      color: '#feca57',
+      stroke: '#1e272e',
+      strokeThickness: 4,
+      shadow: { offsetX: 2, offsetY: 2, color: '#000000', blur: 0, fill: true }
+    }).setOrigin(0.5);
+    titleContainer.add(subTitle);
+
+    // Subtle gentle floating breathing animation on Title
+    this.tweens.add({
+      targets: titleContainer,
+      y: height * 0.13 - 6,
+      duration: 1600,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut'
+    });
 
     // ==========================================
     // 1. PIXELATED LEVEL SELECTOR
     // ==========================================
-    const levelBarY = height * 0.575;
+    const levelBarY = height * 0.585;
     const levelContainer = this.add.container(width / 2, levelBarY);
 
     const barW = Math.min(width * 0.72, 480);
@@ -88,7 +142,7 @@ class MenuScene extends Phaser.Scene {
     // ==========================================
     // 2. PIXELATED DIFFICULTY SELECTOR (3 Tiers)
     // ==========================================
-    const diffBarY = height * 0.705;
+    const diffBarY = height * 0.71;
     const diffContainer = this.add.container(width / 2, diffBarY);
 
     const diffHeader = this.add.text(0, -18, '⚔️ DIFFICULTY:', {
@@ -162,7 +216,7 @@ class MenuScene extends Phaser.Scene {
     // ==========================================
     // 3. PIXELATED ACTION BUTTONS (PLAY, PRACTICE, MAPS)
     // ==========================================
-    const btnY = height * 0.838;
+    const btnY = height * 0.84;
     const btnW = Math.min(width * 0.24, 150);
     const btnH = 46;
     const btnGap = btnW + 24;
@@ -230,7 +284,7 @@ class MenuScene extends Phaser.Scene {
       ? '📱 TOUCH D-PAD TO MOVE | TAP JUMP & DASH'
       : '⌨️ WASD/ARROWS: MOVE | SPACE: JUMP | SHIFT: DASH | R: INVENTORY';
 
-    this.add.text(width / 2, height * 0.942, controlsHelp, {
+    this.add.text(width / 2, height * 0.945, controlsHelp, {
       fontFamily: '"Silkscreen", monospace',
       fontSize: '10px',
       color: '#dcdde1',
