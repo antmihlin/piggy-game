@@ -485,15 +485,23 @@ class GameScene extends Phaser.Scene {
         currentSpeed *= 0.42;
       }
 
-      // Move in grid space
-      this.piggyGrid.x += dx * currentSpeed * dt;
-      this.piggyGrid.y += dy * currentSpeed * dt;
+      // Option 1: True Screen-Relative Isometric Movement
+      // Up (dy = -1) moves straight UP on screen
+      // Down (dy = +1) moves straight DOWN on screen
+      // Left (dx = -1) moves straight LEFT on screen
+      // Right (dx = +1) moves straight RIGHT on screen
+      const scale = 0.55;
+      const gridDeltaX = (dx + 2 * dy) * currentSpeed * scale * dt;
+      const gridDeltaY = (2 * dy - dx) * currentSpeed * scale * dt;
+
+      this.piggyGrid.x += gridDeltaX;
+      this.piggyGrid.y += gridDeltaY;
 
       // Clamp within map bounds
       this.piggyGrid.x = Phaser.Math.Clamp(this.piggyGrid.x, 0.5, this.levelData.gridWidth - 1.5);
       this.piggyGrid.y = Phaser.Math.Clamp(this.piggyGrid.y, 0, this.levelData.gridHeight - 1);
 
-      // Facing
+      // Facing based on screen direction
       if (dx > 0) this.piggy.setFlipX(false);
       else if (dx < 0) this.piggy.setFlipX(true);
 
