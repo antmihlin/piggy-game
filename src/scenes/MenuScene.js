@@ -1,230 +1,327 @@
-// MenuScene: Displays the splash image from the first user image, Title, Level Selector, Controls info
+// MenuScene: Displays the new voxel artwork background, pixelated level selector,
+// 3-tier difficulty selector (Easy, Normal, Hard), and chunky pixel arcade buttons.
 
 class MenuScene extends Phaser.Scene {
   constructor() {
     super({ key: 'MenuScene' });
   }
 
+  init(data) {
+    this.selectedLevelIndex = (data && data.levelIndex !== undefined) ? data.levelIndex : 1; // Default to Level 1: Sunny Pasture
+    this.selectedDifficulty = (data && data.difficulty) ? data.difficulty : 'normal'; // 'easy', 'normal', 'hard'
+  }
+
   create() {
     const width = this.cameras.main.width;
     const height = this.cameras.main.height;
-
-    // Background gradient
-    const bg = this.add.graphics();
-    bg.fillGradientStyle(0x1a252f, 0x1a252f, 0x2c3e50, 0x34495e, 1);
-    bg.fillRect(0, 0, width, height);
-
-    // Decorative floating clouds
-    for (let i = 0; i < 6; i++) {
-      const cloud = this.add.graphics();
-      cloud.fillStyle(0xffffff, 0.08);
-      const cx = Phaser.Math.Between(0, width);
-      const cy = Phaser.Math.Between(40, height - 100);
-      cloud.fillRoundedRect(cx, cy, Phaser.Math.Between(80, 160), 28, 14);
-      this.tweens.add({
-        targets: cloud,
-        x: '+=60',
-        duration: Phaser.Math.Between(6000, 12000),
-        yoyo: true,
-        repeat: -1,
-        ease: 'Sine.easeInOut'
-      });
-    }
-
-    // Hero Splash Artwork (from first user image)
-    if (this.textures.exists('menu_splash')) {
-      const splash = this.add.image(width / 2, height * 0.38, 'menu_splash');
-      // Scale nicely to fit center area
-      const maxH = height * 0.42;
-      const maxW = width * 0.85;
-      const scale = Math.min(maxW / splash.width, maxH / splash.height);
-      splash.setScale(scale);
-
-      // Subtle breathing animation
-      this.tweens.add({
-        targets: splash,
-        y: splash.y - 8,
-        duration: 1800,
-        yoyo: true,
-        repeat: -1,
-        ease: 'Quad.easeInOut'
-      });
-    }
-
-    // Game Title
-    const titleText = this.add.text(width / 2, height * 0.12, 'PIGGY ESCAPE', {
-      fontFamily: 'Impact, Arial Black, sans-serif',
-      fontSize: Math.min(width * 0.09, 52) + 'px',
-      color: '#ff6b81',
-      stroke: '#2d3436',
-      strokeThickness: 8,
-      shadow: { offsetX: 3, offsetY: 4, color: '#000000', blur: 6, stroke: true, fill: true }
-    }).setOrigin(0.5);
-
-    const subTitle = this.add.text(width / 2, height * 0.18, 'FARMER CHASE: VOXEL EDITION', {
-      fontFamily: 'monospace',
-      fontSize: Math.min(width * 0.038, 18) + 'px',
-      color: '#feca57',
-      fontStyle: 'bold',
-      letterSpacing: 2
-    }).setOrigin(0.5);
-
-    // Selected Level State
-    this.selectedLevelIndex = 0;
     const levels = window.GAME_LEVELS || [];
 
-    // Level Selection Bar
-    const levelContainer = this.add.container(width / 2, height * 0.65);
+    // Fallback Background gradient (sunset theme matching the art)
+    const bg = this.add.graphics();
+    bg.fillGradientStyle(0x2d112c, 0x2d112c, 0xf39c12, 0xd35400, 1);
+    bg.fillRect(0, 0, width, height);
 
-    const levelBox = this.add.graphics();
-    levelBox.fillStyle(0x000000, 0.45);
-    levelBox.fillRoundedRect(-170, -28, 340, 56, 12);
-    levelBox.lineStyle(2, 0xff9f43, 0.8);
-    levelBox.strokeRoundedRect(-170, -28, 340, 56, 12);
-    levelContainer.add(levelBox);
+    // New Menu Artwork (from user upload menu_bg_v2.jpg)
+    if (this.textures.exists('menu_bg_v2')) {
+      const splash = this.add.image(width / 2, height / 2, 'menu_bg_v2');
+      const scale = Math.max(width / splash.width, height / splash.height);
+      splash.setScale(scale);
+    } else if (this.textures.exists('menu_splash')) {
+      const splash = this.add.image(width / 2, height * 0.4, 'menu_splash');
+      splash.setScale(Math.min(width * 0.8 / splash.width, height * 0.45 / splash.height));
+    }
 
-    const levelTitle = this.add.text(0, -6, `LEVEL 1: ${levels[0]?.name || 'Sunny Pasture'}`, {
-      fontFamily: 'Arial, sans-serif',
-      fontSize: '18px',
-      color: '#ffffff',
-      fontStyle: 'bold'
+    // Semi-translucent dark pixelated backing panel for lower controls to guarantee contrast & readability
+    const lowerBacking = this.add.graphics();
+    lowerBacking.fillStyle(0x0c1014, 0.55);
+    lowerBacking.fillRect(width * 0.08, height * 0.50, width * 0.84, height * 0.46);
+
+    // ==========================================
+    // 1. PIXELATED LEVEL SELECTOR
+    // ==========================================
+    const levelBarY = height * 0.575;
+    const levelContainer = this.add.container(width / 2, levelBarY);
+
+    const barW = Math.min(width * 0.72, 480);
+    const barH = 50;
+
+    const levelBg = this.add.graphics();
+    this.drawPixelBox(levelBg, 0, 0, barW, barH, 0x1a252f, 0x34495e, 0x0e171b, 0xf39c12, 3);
+    levelContainer.add(levelBg);
+
+    const levelTitle = this.add.text(0, -7, '', {
+      fontFamily: '"Press Start 2P", monospace',
+      fontSize: '12px',
+      color: '#ffffff'
     }).setOrigin(0.5);
     levelContainer.add(levelTitle);
 
-    const levelSub = this.add.text(0, 14, levels[0]?.subtitle || 'Escape the farm!', {
-      fontFamily: 'Arial, sans-serif',
-      fontSize: '11px',
-      color: '#c8d6e5'
+    const levelSub = this.add.text(0, 13, '', {
+      fontFamily: '"Silkscreen", monospace',
+      fontSize: '10px',
+      color: '#feca57'
     }).setOrigin(0.5);
     levelContainer.add(levelSub);
 
-    // Left Level Arrow Button
-    const leftArrow = this.add.text(-145, 0, '◀', {
-      fontSize: '24px',
-      color: '#ff9f43'
-    }).setOrigin(0.5).setInteractive({ useHandCursor: true });
-    leftArrow.on('pointerdown', () => {
+    // Pixel Left Arrow Button
+    const leftArrow = this.createPixelArrowBtn(levelContainer, -barW / 2 + 25, 0, '◀', () => {
       window.sounds?.playOink();
       this.selectedLevelIndex = (this.selectedLevelIndex - 1 + levels.length) % levels.length;
       updateLevelDisplay();
     });
-    levelContainer.add(leftArrow);
 
-    // Right Level Arrow Button
-    const rightArrow = this.add.text(145, 0, '▶', {
-      fontSize: '24px',
-      color: '#ff9f43'
-    }).setOrigin(0.5).setInteractive({ useHandCursor: true });
-    rightArrow.on('pointerdown', () => {
+    // Pixel Right Arrow Button
+    const rightArrow = this.createPixelArrowBtn(levelContainer, barW / 2 - 25, 0, '▶', () => {
       window.sounds?.playOink();
       this.selectedLevelIndex = (this.selectedLevelIndex + 1) % levels.length;
       updateLevelDisplay();
     });
-    levelContainer.add(rightArrow);
 
     const updateLevelDisplay = () => {
-      const lvl = levels[this.selectedLevelIndex];
+      const lvl = levels[this.selectedLevelIndex] || levels[0];
       const titlePrefix = lvl.isTraining ? '🎓 LEVEL 0: ' : `LEVEL ${lvl.id}: `;
       levelTitle.setText(`${titlePrefix}${lvl.name}`);
-      levelSub.setText(lvl.subtitle);
+      levelSub.setText(lvl.subtitle || 'Escape the farm!');
     };
+    updateLevelDisplay();
 
-    // ACTION BUTTONS ROW (Play, Training, Maps)
-    const btnW = 140;
-    const btnH = 50;
-    const btnY = height * 0.78;
+    // ==========================================
+    // 2. PIXELATED DIFFICULTY SELECTOR (3 Tiers)
+    // ==========================================
+    const diffBarY = height * 0.705;
+    const diffContainer = this.add.container(width / 2, diffBarY);
 
-    // 1. PLAY BUTTON (Left)
-    const playBtnContainer = this.add.container(width / 2 - 160, btnY);
-    const btnBg = this.add.graphics();
-    btnBg.fillStyle(0x10ac84, 1);
-    btnBg.fillRoundedRect(-btnW / 2, -btnH / 2, btnW, btnH, 14);
-    btnBg.lineStyle(3, 0x1dd1a1, 1);
-    btnBg.strokeRoundedRect(-btnW / 2, -btnH / 2, btnW, btnH, 14);
-    playBtnContainer.add(btnBg);
-
-    const playText = this.add.text(0, 0, 'PLAY ▶', {
-      fontFamily: 'Impact, Arial Black',
-      fontSize: '20px',
-      color: '#ffffff',
-      letterSpacing: 1
+    const diffHeader = this.add.text(0, -18, '⚔️ DIFFICULTY:', {
+      fontFamily: '"Press Start 2P", monospace',
+      fontSize: '10px',
+      color: '#ecf0f1'
     }).setOrigin(0.5);
-    playBtnContainer.add(playText);
+    diffContainer.add(diffHeader);
 
-    playBtnContainer.setSize(btnW, btnH);
-    playBtnContainer.setInteractive({ useHandCursor: true });
-    playBtnContainer.on('pointerdown', () => {
-      window.sounds?.playOink();
-      this.startGame();
+    const diffOptions = [
+      { id: 'easy', label: '🟢 EASY', col: 0x27ae60, high: 0x2ecc71, desc: 'CHILL PACE: Farmer -20% speed | 3.5s Stun duration' },
+      { id: 'normal', label: '🟡 NORMAL', col: 0xd35400, high: 0xf39c12, desc: 'BALANCED RUN: Standard chase & obstacle density' },
+      { id: 'hard', label: '🔴 HARD', col: 0xc0392b, high: 0xe74c3c, desc: 'FRENZY: Farmer +25% speed | Extra barriers & mud traps!' }
+    ];
+
+    this.diffButtons = [];
+    const diffBtnW = 120;
+    const diffBtnH = 30;
+    const diffSpacing = 135;
+
+    const diffInfoText = this.add.text(0, 24, '', {
+      fontFamily: '"Silkscreen", monospace',
+      fontSize: '9px',
+      color: '#feca57'
+    }).setOrigin(0.5);
+    diffContainer.add(diffInfoText);
+
+    diffOptions.forEach((opt, idx) => {
+      const bx = (idx - 1) * diffSpacing;
+      const btn = this.add.container(bx, 0);
+      const bgG = this.add.graphics();
+      btn.add(bgG);
+
+      const label = this.add.text(0, 0, opt.label, {
+        fontFamily: '"Press Start 2P", monospace',
+        fontSize: '9px',
+        color: '#ffffff'
+      }).setOrigin(0.5);
+      btn.add(label);
+
+      btn.setSize(diffBtnW, diffBtnH);
+      btn.setInteractive({ useHandCursor: true });
+      btn.on('pointerdown', () => {
+        window.sounds?.playOink();
+        this.selectedDifficulty = opt.id;
+        refreshDifficultyUI();
+      });
+
+      this.diffButtons.push({ opt, btn, bgG, label });
+      diffContainer.add(btn);
     });
 
-    // 2. TRAINING BUTTON (Middle - Highlighted in Blue)
-    const trainBtnContainer = this.add.container(width / 2, btnY);
-    const trainBg = this.add.graphics();
-    trainBg.fillStyle(0x0984e3, 1);
-    trainBg.fillRoundedRect(-btnW / 2, -btnH / 2, btnW, btnH, 14);
-    trainBg.lineStyle(3, 0x74b9ff, 1);
-    trainBg.strokeRoundedRect(-btnW / 2, -btnH / 2, btnW, btnH, 14);
-    trainBtnContainer.add(trainBg);
+    const refreshDifficultyUI = () => {
+      this.diffButtons.forEach(item => {
+        const isSelected = item.opt.id === this.selectedDifficulty;
+        item.bgG.clear();
+        if (isSelected) {
+          this.drawPixelBox(item.bgG, 0, 0, diffBtnW, diffBtnH, item.opt.col, item.opt.high, 0x111111, 0xffffff, 3);
+          item.label.setColor('#ffffff');
+          item.label.setScale(1.05);
+          diffInfoText.setText(item.opt.desc);
+        } else {
+          this.drawPixelBox(item.bgG, 0, 0, diffBtnW, diffBtnH, 0x2c3e50, 0x34495e, 0x111111, 0x7f8c8d, 2);
+          item.label.setColor('#95a5a6');
+          item.label.setScale(1.0);
+        }
+      });
+    };
+    refreshDifficultyUI();
 
-    const trainText = this.add.text(0, 0, '🎓 PRACTICE', {
-      fontFamily: 'Impact, Arial Black',
-      fontSize: '18px',
-      color: '#ffffff',
-      letterSpacing: 1
-    }).setOrigin(0.5);
-    trainBtnContainer.add(trainText);
+    // ==========================================
+    // 3. PIXELATED ACTION BUTTONS (PLAY, PRACTICE, MAPS)
+    // ==========================================
+    const btnY = height * 0.838;
+    const btnW = Math.min(width * 0.24, 150);
+    const btnH = 46;
+    const btnGap = btnW + 24;
 
-    trainBtnContainer.setSize(btnW, btnH);
-    trainBtnContainer.setInteractive({ useHandCursor: true });
-    trainBtnContainer.on('pointerdown', () => {
-      window.sounds?.playOink();
-      this.scene.start('GameScene', { levelIndex: 0 }); // Launch Training Yard directly!
-    });
+    // 1. PLAY BUTTON (Green)
+    this.createPixelActionButton(
+      width / 2 - btnGap,
+      btnY,
+      btnW,
+      btnH,
+      'PLAY ▶',
+      0x27ae60, // base
+      0x2ecc71, // highlight
+      0x145a32, // shadow
+      0x0e3a1f, // border
+      () => {
+        window.sounds?.playOink();
+        this.startGame();
+      }
+    );
 
-    // 3. LEVEL MAPS PREVIEW BUTTON (Right - Orange)
-    const previewBtnContainer = this.add.container(width / 2 + 160, btnY);
-    const prevBg = this.add.graphics();
-    prevBg.fillStyle(0xe67e22, 1);
-    prevBg.fillRoundedRect(-btnW / 2, -btnH / 2, btnW, btnH, 14);
-    prevBg.lineStyle(3, 0xf39c12, 1);
-    prevBg.strokeRoundedRect(-btnW / 2, -btnH / 2, btnW, btnH, 14);
-    previewBtnContainer.add(prevBg);
+    // 2. PRACTICE BUTTON (Blue)
+    this.createPixelActionButton(
+      width / 2,
+      btnY,
+      btnW + 20,
+      btnH,
+      '🎓 PRACTICE',
+      0x2980b9, // base
+      0x3498db, // highlight
+      0x1b4f72, // shadow
+      0x154360, // border
+      () => {
+        window.sounds?.playOink();
+        this.scene.start('GameScene', { levelIndex: 0, difficulty: this.selectedDifficulty });
+      }
+    );
 
-    const prevText = this.add.text(0, 0, '🗺️ MAPS', {
-      fontFamily: 'Impact, Arial Black',
-      fontSize: '20px',
-      color: '#ffffff',
-      letterSpacing: 1
-    }).setOrigin(0.5);
-    previewBtnContainer.add(prevText);
-
-    previewBtnContainer.setSize(btnW, btnH);
-    previewBtnContainer.setInteractive({ useHandCursor: true });
-    previewBtnContainer.on('pointerdown', () => {
-      window.sounds?.playOink();
-      this.scene.start('LevelPreviewScene', { levelIndex: this.selectedLevelIndex });
-    });
+    // 3. MAPS BUTTON (Orange)
+    this.createPixelActionButton(
+      width / 2 + btnGap,
+      btnY,
+      btnW,
+      btnH,
+      '🗺️ MAPS',
+      0xd35400, // base
+      0xe67e22, // highlight
+      0x78281f, // shadow
+      0x641e16, // border
+      () => {
+        window.sounds?.playOink();
+        this.scene.start('LevelPreviewScene', { levelIndex: this.selectedLevelIndex, difficulty: this.selectedDifficulty });
+      }
+    );
 
     // Keyboard Space or Enter to start
     this.input.keyboard.on('keydown-SPACE', () => this.startGame());
     this.input.keyboard.on('keydown-ENTER', () => this.startGame());
 
-    // Controls Help Footer
+    // ==========================================
+    // 4. PIXEL CONTROLS FOOTER
+    // ==========================================
     const isMobile = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0) || (window.innerWidth <= 900);
     const controlsHelp = isMobile
-      ? '📱 Touch D-Pad to move | Tap JUMP & DASH'
-      : '⌨️ WASD / Arrows = Move | SPACE = Jump | SHIFT / E = Dash';
+      ? '📱 TOUCH D-PAD TO MOVE | TAP JUMP & DASH'
+      : '⌨️ WASD/ARROWS: MOVE | SPACE: JUMP | SHIFT: DASH | R: INVENTORY';
 
-    this.add.text(width / 2, height * 0.93, controlsHelp, {
-      fontFamily: 'Arial, sans-serif',
-      fontSize: '13px',
-      color: '#a4b0be',
+    this.add.text(width / 2, height * 0.942, controlsHelp, {
+      fontFamily: '"Silkscreen", monospace',
+      fontSize: '10px',
+      color: '#dcdde1',
       align: 'center'
     }).setOrigin(0.5);
   }
 
+  // Draw an authentic stepped-corner arcade voxel pixel box
+  drawPixelBox(g, x, y, w, h, baseCol, highCol, shadowCol, borderCol, borderThick = 2) {
+    const hw = w / 2;
+    const hh = h / 2;
+    const step = 4; // 4px pixel cut on corners
+
+    // 1. Dark outer border with stepped pixel corners
+    g.fillStyle(borderCol, 1);
+    g.fillRect(x - hw + step, y - hh, w - step * 2, h);
+    g.fillRect(x - hw, y - hh + step, w, h - step * 2);
+
+    // 2. Shadow depth at bottom & right
+    g.fillStyle(shadowCol, 1);
+    g.fillRect(x - hw + borderThick, y - hh + borderThick, w - borderThick * 2, h - borderThick * 2);
+
+    // 3. Bevel Highlight at top & left
+    g.fillStyle(highCol, 1);
+    g.fillRect(x - hw + borderThick, y - hh + borderThick, w - borderThick * 2 - 3, h - borderThick * 2 - 4);
+
+    // 4. Face fill in middle
+    g.fillStyle(baseCol, 1);
+    g.fillRect(x - hw + borderThick + 2, y - hh + borderThick + 3, w - borderThick * 2 - 6, h - borderThick * 2 - 7);
+  }
+
+  createPixelArrowBtn(parent, x, y, symbol, onClick) {
+    const btn = this.add.container(x, y);
+    const g = this.add.graphics();
+    this.drawPixelBox(g, 0, 0, 32, 32, 0x2c3e50, 0xf39c12, 0x111111, 0xf39c12, 2);
+    btn.add(g);
+
+    const txt = this.add.text(0, 0, symbol, {
+      fontFamily: '"Press Start 2P", monospace',
+      fontSize: '12px',
+      color: '#ffffff'
+    }).setOrigin(0.5);
+    btn.add(txt);
+
+    btn.setSize(32, 32);
+    btn.setInteractive({ useHandCursor: true });
+    btn.on('pointerdown', onClick);
+    btn.on('pointerover', () => btn.setScale(1.1));
+    btn.on('pointerout', () => btn.setScale(1.0));
+    parent.add(btn);
+    return btn;
+  }
+
+  createPixelActionButton(x, y, w, h, label, baseCol, highCol, shadowCol, borderCol, onClick) {
+    const btn = this.add.container(x, y);
+    const g = this.add.graphics();
+    this.drawPixelBox(g, 0, 0, w, h, baseCol, highCol, shadowCol, borderCol, 3);
+    btn.add(g);
+
+    const txt = this.add.text(0, -1, label, {
+      fontFamily: '"Press Start 2P", monospace',
+      fontSize: '11px',
+      color: '#ffffff'
+    }).setOrigin(0.5);
+    btn.add(txt);
+
+    btn.setSize(w, h);
+    btn.setInteractive({ useHandCursor: true });
+
+    btn.on('pointerover', () => {
+      btn.setScale(1.04);
+    });
+    btn.on('pointerout', () => {
+      btn.setScale(1.0);
+      btn.y = y;
+    });
+    btn.on('pointerdown', () => {
+      btn.y = y + 2; // Mechanical press feedback
+    });
+    btn.on('pointerup', () => {
+      btn.y = y;
+      onClick();
+    });
+
+    return btn;
+  }
+
   startGame() {
-    this.scene.start('GameScene', { levelIndex: this.selectedLevelIndex });
+    this.scene.start('GameScene', {
+      levelIndex: this.selectedLevelIndex,
+      difficulty: this.selectedDifficulty
+    });
   }
 }

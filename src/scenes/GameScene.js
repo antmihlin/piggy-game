@@ -8,6 +8,7 @@ class GameScene extends Phaser.Scene {
   init(data) {
     this.levelIndex = data.levelIndex || 0;
     this.levelData = (window.GAME_LEVELS && window.GAME_LEVELS[this.levelIndex]) || window.GAME_LEVELS[0];
+    this.difficulty = (data && data.difficulty) ? data.difficulty : 'normal'; // 'easy', 'normal', 'hard'
     
     // Isometric metrics matching 64x54 voxel cubes
     this.tileWidth = 64;
@@ -20,8 +21,14 @@ class GameScene extends Phaser.Scene {
     this.isGameOver = false;
     this.isVictory = false;
 
-    // Grace period (3 seconds head start for Piggy)
-    this.graceTime = 3.0;
+    // Grace period scaled by difficulty
+    if (this.difficulty === 'easy') {
+      this.graceTime = 3.6;
+    } else if (this.difficulty === 'hard') {
+      this.graceTime = 1.6;
+    } else {
+      this.graceTime = 2.8;
+    }
 
     // Dash state
     this.dashCooldown = 0;
@@ -33,13 +40,18 @@ class GameScene extends Phaser.Scene {
     this.piggyVZ = 0;
     this.isJumping = false;
 
-    // Farmer state
-    this.farmerSpeed = this.levelData.farmerSpeed || 82;
+    // Farmer speed scaled by difficulty (Easy -20%, Hard +25%)
+    let speedMult = 1.0;
+    if (this.difficulty === 'easy') speedMult = 0.8;
+    else if (this.difficulty === 'hard') speedMult = 1.25;
+
+    this.farmerSpeed = (this.levelData.farmerSpeed || 82) * (this.levelData.isTraining ? 0 : speedMult);
     this.farmerMudSlow = 0;
     this.farmerStunTimer = 0;
 
-    // Inventory and Buffs
+    // Inventory and Buffs & Time Slow-motion
     this.inventory = [];
+    this.isInventoryOpen = false;
     this.buffSpeed = 0;
     this.buffJump = 0;
     this.buffInvis = 0;
@@ -100,9 +112,14 @@ class GameScene extends Phaser.Scene {
     // Listen to UI Scene Commands
     this.events.on('useArtifact', (idx) => this.activateArtifact(idx));
     this.events.on('throwDirt', () => this.dropMudPatch());
+    this.events.on('inventoryToggled', (isOpen) => {
+      this.isInventoryOpen = isOpen;
+      this.time.timeScale = isOpen ? 0.2 : 1.0;
+      this.tweens.timeScale = isOpen ? 0.2 : 1.0;
+    });
 
-    // Launch UI Scene
-    this.scene.launch('UIScene', { levelIndex: this.levelIndex });
+    // Launch UI Scene with level & difficulty
+    this.scene.launch('UIScene', { levelIndex: this.levelIndex, difficulty: this.difficulty });
 
     // Initial event dispatch
     this.events.emit('updateScore', this.score);
@@ -215,9 +232,37 @@ class GameScene extends Phaser.Scene {
       }
     }
 
-    // Place Obstacles
+    // Place Obstacles (Base + Dynamic Difficulty Obstacles)
     this.obstacles = [];
-    (this.levelData.obstacles || []).forEach(obs => {
+    const obsList = (this.levelData.obstacles || []).map(o => ({ ...o }));
+
+    // Higher Difficulty = More barriers, traps, and hazards!
+    if (this.difficulty === 'hard' && !this.levelData.isTraining) {
+      const gh = this.levelData.gridHeight || 24;
+      const px = this.levelData.pathX !== undefined ? this.levelData.pathX : 5;
+      
+      // Inject extra alternating spikes and thorns along the escape path
+      const extraRows = [6, 10, 13, 17, 20];
+      extraRows.forEach((ry, idx) => {
+        if (ry < gh - 3 && ry > 3) {
+          const type = (idx % 2 === 0) ? 'spikes' : 'thorn';
+          const col = (idx % 3 === 0) ? px : (idx % 2 === 0 ? px - 1 : px + 1);
+          if (!obsList.some(o => o.x === col && o.y === ry)) {
+            obsList.push({ type: type, x: col, y: ry, z: 0 });
+          }
+        }
+      });
+
+      // Inject extra slippery mud pits on Hard
+      if (!obsList.some(o => o.y === 9)) {
+        obsList.push({ type: 'mud', x: px, y: 9, z: 0 });
+      }
+      if (!obsList.some(o => o.y === 16 && Math.abs(o.x - px) <= 1)) {
+        obsList.push({ type: 'mud', x: px - 1, y: 16, z: 0 });
+      }
+    }
+
+    obsList.forEach(obs => {
       const iso = this.gridToIso(obs.x, obs.y, obs.z || 0);
       const sprite = this.add.image(iso.x, iso.y, obs.type);
       sprite.setOrigin(0.5, 0.7);
@@ -407,7 +452,10 @@ class GameScene extends Phaser.Scene {
 
   update(time, delta) {
     if (this.isGameOver || this.isVictory) return;
-    const dt = delta / 1000; // in seconds
+    
+    // Slow-motion time dilation when inventory is open (gives player time to plan abilities)
+    const timeScale = this.isInventoryOpen ? 0.18 : 1.0;
+    const dt = (delta / 1000) * timeScale; // in seconds (slow-mo scaled)
 
     // Update Grace Period (Head Start)
     if (this.graceTime > 0) {
@@ -981,7 +1029,8 @@ class GameScene extends Phaser.Scene {
   }
 
   injureFarmer(cause) {
-    this.farmerStunTimer = 2.4;
+    const stunDur = this.difficulty === 'easy' ? 3.5 : (this.difficulty === 'hard' ? 1.5 : 2.4);
+    this.farmerStunTimer = stunDur;
     window.sounds?.playFarmerStun();
     this.farmer.setTint(0xff3838);
     // Knock back along Y away from hazard
@@ -989,7 +1038,7 @@ class GameScene extends Phaser.Scene {
     const fIso = this.gridToIso(this.farmerGrid.x, this.farmerGrid.y, 0);
     this.farmer.x = fIso.x;
     this.farmer.y = fIso.y;
-    this.showFloatingText(fIso.x, fIso.y - 50, `💥 ${cause}! STUNNED!`, '#e74c3c');
+    this.showFloatingText(fIso.x, fIso.y - 50, `💥 ${cause}! STUNNED (${stunDur}s)!`, '#e74c3c');
   }
 
   showFloatingText(x, y, text, color = '#ffffff') {

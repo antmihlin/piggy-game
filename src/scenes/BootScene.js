@@ -30,6 +30,7 @@ class BootScene extends Phaser.Scene {
 
     // Load uploaded assets
     this.load.image('menu_splash', 'public/assets/menu_splash.png');
+    this.load.image('menu_bg_v2', 'public/assets/menu_bg_v2.jpg');
     this.load.image('world_tilesheet', 'public/assets/world_tilesheet.jpg');
 
     this.load.on('loaderror', (fileObj) => {

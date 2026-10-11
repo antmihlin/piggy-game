@@ -34,9 +34,25 @@ An optimized 2.5D isometric voxel browser game built with **Phaser 3**, featurin
      - 🐷 **Decoy Piggy (Mirage Clone):** Spawns a life-sized clone doll that distracts and lures the farmer away until it pops in a puff of confetti!
      - 💩 **Mud Ball (Dirt Throw):** Press `Q` to splat mud on the ground, causing farmers to slip, stumble, and slow down by 60%.
 
-2. **🌵 Farmer Hazard & Trap Reactions:**
+2. **⏳ Slow-Motion Bullet Time on Inventory Opening:**
+   - Opening Piggy's backpack (`R` key or `🎒 BAG` button) instantly dilates time into cinematic **0.18× slow motion**!
+   - Piggy, the chasing farmer, traps, and countdown clocks slow down, giving you ample breathing room to inspect artifacts and trigger abilities strategically.
+   - Closing the inventory seamlessly resumes normal game speed.
+
+3. **⚔️ 3-Tier Difficulty Modes:**
+   - Choose your challenge level directly from the main menu:
+     - 🟢 **Easy (Piglet):** Farmer speed reduced by 20%, longer hazard stun duration (3.5s), and extra reaction grace time.
+     - 🟡 **Normal (Runner):** Standard balanced speed and obstacle layout (2.4s stun).
+     - 🔴 **Hard (Farmer Frenzy):** Farmer speed boosted by 25%, shorter reaction grace (1.6s), quick hazard recovery (1.5s stun), plus **extra barriers, alternating spike rows, cactus hazards, and mud pits dynamically injected along the escape path!**
+
+4. **🎨 Pixelated Arcade Menu & UI:**
+   - Authentic voxel sunset main menu art featuring Piggy running from the pitchfork-wielding farmer.
+   - Stepped-corner arcade buttons with 3D bevels and Google Fonts pixel typography (`Press Start 2P`, `Silkscreen`).
+   - Difficulty badge displayed live on the in-game HUD bar (`🟢 EASY`, `🟡 NORMAL`, `🔴 HARD`).
+
+5. **🌵 Farmer Hazard & Trap Reactions:**
    - The farmer is no longer invincible!
-   - Bait the farmer into **spikes** or **thorns/cacti**: they will damage, knock back, and stun him for 2.4 seconds with cartoon dizzy stars (`⭐`), buying Piggy precious escape time!
+   - Bait the farmer into **spikes** or **thorns/cacti**: they will damage, knock back, and stun him (duration scales with difficulty), buying Piggy precious escape time!
 
 3. **2.5D Isometric Voxel World:**
    - Inspired directly by the world design spreadsheet: grass cubes, dirt paths, modular red barn, wooden fences, blocky trees, pumpkins, and more.

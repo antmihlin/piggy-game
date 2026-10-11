@@ -7,6 +7,7 @@ class LevelPreviewScene extends Phaser.Scene {
 
   init(data) {
     this.currentLevelIndex = data?.levelIndex || 0;
+    this.difficulty = data?.difficulty || 'normal';
     this.levels = window.GAME_LEVELS || [];
     this.tileWidth = 64;
     this.tileHeight = 32;
@@ -284,8 +285,8 @@ class LevelPreviewScene extends Phaser.Scene {
     playBtn.add(pBg);
 
     const pText = this.add.text(0, 0, 'PLAY ▶', {
-      fontFamily: 'Arial Black',
-      fontSize: '14px',
+      fontFamily: '"Press Start 2P", monospace',
+      fontSize: '11px',
       color: '#ffffff'
     }).setOrigin(0.5);
     playBtn.add(pText);
@@ -294,7 +295,7 @@ class LevelPreviewScene extends Phaser.Scene {
     playBtn.setInteractive({ useHandCursor: true });
     playBtn.on('pointerdown', () => {
       window.sounds?.playOink();
-      this.scene.start('GameScene', { levelIndex: this.currentLevelIndex });
+      this.scene.start('GameScene', { levelIndex: this.currentLevelIndex, difficulty: this.difficulty });
     });
 
     // Back to Menu Button (Left Bottom)
@@ -307,8 +308,8 @@ class LevelPreviewScene extends Phaser.Scene {
     backBtn.add(bBg);
 
     const bText = this.add.text(0, 0, '◀ BACK', {
-      fontFamily: 'Arial Black',
-      fontSize: '12px',
+      fontFamily: '"Press Start 2P", monospace',
+      fontSize: '10px',
       color: '#ecf0f1'
     }).setOrigin(0.5);
     backBtn.add(bText);
@@ -317,7 +318,7 @@ class LevelPreviewScene extends Phaser.Scene {
     backBtn.setInteractive({ useHandCursor: true });
     backBtn.on('pointerdown', () => {
       window.sounds?.playOink();
-      this.scene.start('MenuScene');
+      this.scene.start('MenuScene', { levelIndex: this.currentLevelIndex, difficulty: this.difficulty });
     });
 
     // Zoom Buttons (+ / -) in bottom-right corner

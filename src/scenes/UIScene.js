@@ -7,6 +7,7 @@ class UIScene extends Phaser.Scene {
 
   init(data) {
     this.levelIndex = (data && data.levelIndex !== undefined) ? data.levelIndex : 0;
+    this.difficulty = (data && data.difficulty) ? data.difficulty : 'normal';
   }
 
   create() {
@@ -23,44 +24,52 @@ class UIScene extends Phaser.Scene {
 
     // 1. Top HUD Bar Background
     const hudBg = this.add.graphics();
-    hudBg.fillStyle(0x000000, 0.45);
-    hudBg.fillRoundedRect(12, 10, width - 24, 56, 14);
+    hudBg.fillStyle(0x000000, 0.55);
+    hudBg.fillRoundedRect(12, 10, width - 24, 56, 10);
+    hudBg.lineStyle(2, 0x57606f, 0.8);
+    hudBg.strokeRoundedRect(12, 10, width - 24, 56, 10);
 
     // 2. Main Menu Button (Top Left)
-    this.createHudButton(24, 20, 80, 36, '🏠 MENU', 0x34495e, () => {
+    this.createHudButton(24, 20, 84, 36, '🏠 MENU', 0x2f3542, () => {
       window.sounds?.playOink();
       this.scene.stop('UIScene');
       this.scene.stop('GameScene');
-      this.scene.start('MenuScene');
+      this.scene.start('MenuScene', { levelIndex: this.levelIndex, difficulty: this.difficulty });
     });
 
     // 3. Score Display
-    this.scoreText = this.add.text(120, 27, '⭐ SCORE: 0', {
-      fontFamily: 'monospace',
-      fontSize: '17px',
-      color: '#f1c40f',
-      fontStyle: 'bold'
+    this.scoreText = this.add.text(125, 28, '⭐ 0', {
+      fontFamily: '"Press Start 2P", monospace',
+      fontSize: '12px',
+      color: '#f1c40f'
     });
 
     // 4. Time Display
-    this.timeText = this.add.text(width / 2 - 20, 27, '⏱️ 60s', {
-      fontFamily: 'monospace',
-      fontSize: '18px',
-      color: '#ffffff',
-      fontStyle: 'bold'
+    this.timeText = this.add.text(width / 2 - 35, 28, '⏱️ 60s', {
+      fontFamily: '"Press Start 2P", monospace',
+      fontSize: '12px',
+      color: '#ffffff'
+    }).setOrigin(0.5, 0);
+
+    // 4b. Difficulty Badge in HUD
+    const diffLabel = this.difficulty === 'hard' ? '🔴 HARD' : (this.difficulty === 'easy' ? '🟢 EASY' : '🟡 NORMAL');
+    const diffColor = this.difficulty === 'hard' ? '#ff4757' : (this.difficulty === 'easy' ? '#2ed573' : '#ffa502');
+    this.diffBadge = this.add.text(width / 2 + 55, 28, diffLabel, {
+      fontFamily: '"Press Start 2P", monospace',
+      fontSize: '10px',
+      color: diffColor
     }).setOrigin(0.5, 0);
 
     // 5. Inventory Bag Button (Top Right area)
-    this.bagBtn = this.createHudButton(width - 240, 20, 105, 36, '🎒 BAG [R] (0)', 0x8e44ad, () => {
+    this.bagBtn = this.createHudButton(width - 250, 20, 115, 36, '🎒 BAG [R] (0)', 0x6c5ce7, () => {
       this.toggleInventory();
     });
 
     // 6. Dash / Boost Meter
-    this.dashText = this.add.text(width - 24, 27, '⚡ DASH [SHIFT]', {
-      fontFamily: 'monospace',
-      fontSize: '16px',
-      color: '#2ecc71',
-      fontStyle: 'bold'
+    this.dashText = this.add.text(width - 24, 28, '⚡ DASH', {
+      fontFamily: '"Press Start 2P", monospace',
+      fontSize: '11px',
+      color: '#2ecc71'
     }).setOrigin(1, 0);
 
     // 7. Tension Radar Bar: Shows Farmer -> Piggy -> Barn Goal
@@ -243,46 +252,57 @@ class UIScene extends Phaser.Scene {
     overlay.setInteractive(new Phaser.Geom.Rectangle(-width / 2, -height / 2, width, height), Phaser.Geom.Rectangle.Contains);
     this.inventoryModal.add(overlay);
 
-    const modalW = 440;
-    const modalH = 340;
+    const modalW = 460;
+    const modalH = 350;
     const box = this.add.graphics();
-    box.fillStyle(0x1a252f, 0.97);
-    box.fillRoundedRect(-modalW / 2, -modalH / 2, modalW, modalH, 18);
-    box.lineStyle(2.5, 0x9b59b6, 1);
-    box.strokeRoundedRect(-modalW / 2, -modalH / 2, modalW, modalH, 18);
+    box.fillStyle(0x1a252f, 0.98);
+    box.fillRoundedRect(-modalW / 2, -modalH / 2, modalW, modalH, 12);
+    box.lineStyle(3, 0x9b59b6, 1);
+    box.strokeRoundedRect(-modalW / 2, -modalH / 2, modalW, modalH, 12);
     this.inventoryModal.add(box);
 
-    const title = this.add.text(0, -modalH / 2 + 26, '🎒 ARTIFACT INVENTORY', {
-      fontFamily: 'Impact, Arial Black',
-      fontSize: '22px',
-      color: '#f1c40f',
-      letterSpacing: 1
+    const title = this.add.text(0, -modalH / 2 + 24, '🎒 ARTIFACT INVENTORY', {
+      fontFamily: '"Press Start 2P", monospace',
+      fontSize: '14px',
+      color: '#f1c40f'
     }).setOrigin(0.5);
     this.inventoryModal.add(title);
 
-    const sub = this.add.text(0, -modalH / 2 + 48, 'Press key (1-5) or click USE to activate temporary ability | Press R to close', {
-      fontFamily: 'Arial',
-      fontSize: '11px',
+    // Bullet-time Slow Motion Banner
+    const slowMoBanner = this.add.text(0, -modalH / 2 + 48, '⏳ BULLET TIME: 0.18x SLOW-MO ACTIVATED', {
+      fontFamily: '"Press Start 2P", monospace',
+      fontSize: '9px',
+      color: '#00d2d3'
+    }).setOrigin(0.5);
+    this.inventoryModal.add(slowMoBanner);
+
+    const sub = this.add.text(0, -modalH / 2 + 68, 'Time is slowed! Press [1-5] or click USE to activate | [R] or [ESC] to close', {
+      fontFamily: 'monospace',
+      fontSize: '10px',
       color: '#bdc3c7'
     }).setOrigin(0.5);
     this.inventoryModal.add(sub);
 
     // Close Button (X)
     const closeBtn = this.add.text(modalW / 2 - 25, -modalH / 2 + 15, '✖', {
-      fontSize: '20px',
+      fontFamily: '"Press Start 2P", monospace',
+      fontSize: '14px',
       color: '#e74c3c'
     }).setInteractive({ useHandCursor: true });
     closeBtn.on('pointerdown', () => this.toggleInventory());
     this.inventoryModal.add(closeBtn);
 
     // Item Slots Container
-    this.slotsContainer = this.add.container(0, -10);
+    this.slotsContainer = this.add.container(0, 10);
     this.inventoryModal.add(this.slotsContainer);
   }
 
   toggleInventory() {
     this.isInventoryOpen = !this.isInventoryOpen;
     this.inventoryModal.setVisible(this.isInventoryOpen);
+
+    // Notify GameScene to engage or disengage bullet-time slow motion!
+    this.gameScene?.events.emit('inventoryToggled', this.isInventoryOpen);
 
     if (this.isInventoryOpen) {
       window.sounds?.playOink();
@@ -322,33 +342,33 @@ class UIScene extends Phaser.Scene {
       row.add(slotBg);
 
       // Icon & Name
-      const nameText = this.add.text(-180, 0, `${item.icon} [${idx + 1}] ${item.name}`, {
-        fontFamily: 'Impact, Arial Black',
-        fontSize: '14px',
+      const nameText = this.add.text(-185, 0, `${item.icon} [${idx + 1}] ${item.name}`, {
+        fontFamily: '"Press Start 2P", monospace',
+        fontSize: '9px',
         color: '#ffffff'
       }).setOrigin(0, 0.5);
       row.add(nameText);
 
       // Description
-      const descText = this.add.text(-30, 0, item.desc, {
-        fontFamily: 'Arial',
-        fontSize: '11px',
+      const descText = this.add.text(-25, 0, item.desc, {
+        fontFamily: 'monospace',
+        fontSize: '10px',
         color: '#feca57'
       }).setOrigin(0, 0.5);
       row.add(descText);
 
       // Use Button
-      const useBtn = this.add.container(145, 0);
+      const useBtn = this.add.container(148, 0);
       const uBg = this.add.graphics();
       uBg.fillStyle(0x27ae60, 1);
-      uBg.fillRoundedRect(-35, -14, 70, 28, 6);
-      uBg.lineStyle(1, 0xffffff, 0.5);
-      uBg.strokeRoundedRect(-35, -14, 70, 28, 6);
+      uBg.fillRoundedRect(-36, -14, 72, 28, 4);
+      uBg.lineStyle(1.5, 0x2ecc71, 1);
+      uBg.strokeRoundedRect(-36, -14, 72, 28, 4);
       useBtn.add(uBg);
 
-      const uLabel = this.add.text(0, 0, `USE (${idx + 1})`, {
-        fontFamily: 'Impact, Arial Black',
-        fontSize: '11px',
+      const uLabel = this.add.text(0, 0, `USE [${idx + 1}]`, {
+        fontFamily: '"Press Start 2P", monospace',
+        fontSize: '8px',
         color: '#ffffff'
       }).setOrigin(0.5);
       useBtn.add(uLabel);
