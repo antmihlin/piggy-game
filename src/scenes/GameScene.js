@@ -36,6 +36,16 @@ class GameScene extends Phaser.Scene {
     // Farmer state
     this.farmerSpeed = this.levelData.farmerSpeed || 82;
     this.farmerMudSlow = 0;
+    this.farmerStunTimer = 0;
+
+    // Inventory and Buffs
+    this.inventory = [];
+    this.buffSpeed = 0;
+    this.buffJump = 0;
+    this.buffInvis = 0;
+    this.buffClone = 0;
+    this.cloneGrid = null;
+    this.cloneSprite = null;
 
     // Touch controls input state
     this.touchInput = { up: false, down: false, left: false, right: false };
@@ -77,8 +87,19 @@ class GameScene extends Phaser.Scene {
       shift: Phaser.Input.Keyboard.KeyCodes.SHIFT,
       e: Phaser.Input.Keyboard.KeyCodes.E,
       j: Phaser.Input.Keyboard.KeyCodes.J,
-      z: Phaser.Input.Keyboard.KeyCodes.Z
+      z: Phaser.Input.Keyboard.KeyCodes.Z,
+      r: Phaser.Input.Keyboard.KeyCodes.R,
+      q: Phaser.Input.Keyboard.KeyCodes.Q,
+      one: Phaser.Input.Keyboard.KeyCodes.ONE,
+      two: Phaser.Input.Keyboard.KeyCodes.TWO,
+      three: Phaser.Input.Keyboard.KeyCodes.THREE,
+      four: Phaser.Input.Keyboard.KeyCodes.FOUR,
+      five: Phaser.Input.Keyboard.KeyCodes.FIVE
     });
+
+    // Listen to UI Scene Commands
+    this.events.on('useArtifact', (idx) => this.activateArtifact(idx));
+    this.events.on('throwDirt', () => this.dropMudPatch());
 
     // Launch UI Scene
     this.scene.launch('UIScene', { levelIndex: this.levelIndex });
@@ -87,6 +108,8 @@ class GameScene extends Phaser.Scene {
     this.events.emit('updateScore', this.score);
     this.events.emit('updateTime', this.timeLeft);
     this.events.emit('updateDash', true);
+    this.events.emit('updateInventory', this.inventory);
+    this.events.emit('updateBuffs', { speed: 0, jump: 0, invis: 0, clone: 0 });
 
     // Head Start / Training Banner
     const bannerStr = this.levelData.isTraining ? '🎓 TRAINING YARD 🎓\nPractice Movement, Jumping & Dashing!' : 'READY...';
@@ -109,7 +132,13 @@ class GameScene extends Phaser.Scene {
         this.dustEmitter.destroy();
         this.dustEmitter = null;
       }
+      if (this.cloneSprite) {
+        this.cloneSprite.destroy();
+        this.cloneSprite = null;
+      }
       this.tweens.killAll();
+      this.events.off('useArtifact');
+      this.events.off('throwDirt');
       this.scene.stop('UIScene');
     });
 
@@ -354,9 +383,9 @@ class GameScene extends Phaser.Scene {
   requestJump() {
     if (this.isJumping || this.isGameOver || this.isVictory) return;
     this.isJumping = true;
-    this.piggyVZ = 6.2;
+    this.piggyVZ = this.buffJump > 0 ? 10.4 : 6.2;
     window.sounds?.playJump();
-    this.spawnDust(this.piggy.x, this.piggy.y);
+    this.spawnDust(this.piggy.x, this.piggy.y, this.buffJump > 0 ? 8 : 4);
   }
 
   requestDash() {
@@ -427,6 +456,44 @@ class GameScene extends Phaser.Scene {
       }
     }
 
+    // Update Buff Timers
+    let buffsChanged = false;
+    if (this.buffSpeed > 0) {
+      this.buffSpeed -= dt;
+      if (this.buffSpeed <= 0) this.buffSpeed = 0;
+      buffsChanged = true;
+    }
+    if (this.buffJump > 0) {
+      this.buffJump -= dt;
+      if (this.buffJump <= 0) this.buffJump = 0;
+      buffsChanged = true;
+    }
+    if (this.buffInvis > 0) {
+      this.buffInvis -= dt;
+      if (this.buffInvis <= 0) {
+        this.buffInvis = 0;
+        this.piggy.setAlpha(1.0);
+      }
+      buffsChanged = true;
+    }
+    if (this.buffClone > 0) {
+      this.buffClone -= dt;
+      this.updateClone(dt);
+      if (this.buffClone <= 0) {
+        this.buffClone = 0;
+        this.removeClone();
+      }
+      buffsChanged = true;
+    }
+    if (buffsChanged) {
+      this.events.emit('updateBuffs', {
+        speed: this.buffSpeed,
+        jump: this.buffJump,
+        invis: this.buffInvis,
+        clone: this.buffClone
+      });
+    }
+
     // Handle Piggy Input & Movement
     this.handlePiggyMovement(dt);
 
@@ -469,6 +536,24 @@ class GameScene extends Phaser.Scene {
       this.requestDash();
     }
 
+    // Inventory Toggle with 'R'
+    if (Phaser.Input.Keyboard.JustDown(k.r)) {
+      const ui = this.scene.get('UIScene');
+      if (ui) ui.toggleInventory();
+    }
+
+    // Quick Mud Throw with 'Q'
+    if (Phaser.Input.Keyboard.JustDown(k.q)) {
+      this.dropMudPatch();
+    }
+
+    // Number keys 1-5 for quick artifact activation
+    if (Phaser.Input.Keyboard.JustDown(k.one)) this.activateArtifact(0);
+    if (Phaser.Input.Keyboard.JustDown(k.two)) this.activateArtifact(1);
+    if (Phaser.Input.Keyboard.JustDown(k.three)) this.activateArtifact(2);
+    if (Phaser.Input.Keyboard.JustDown(k.four)) this.activateArtifact(3);
+    if (Phaser.Input.Keyboard.JustDown(k.five)) this.activateArtifact(4);
+
     // Calculate movement vector
     if (dx !== 0 || dy !== 0) {
       // Normalize diagonal speed
@@ -479,6 +564,7 @@ class GameScene extends Phaser.Scene {
       // Base speed calculation
       let currentSpeed = this.piggyBaseSpeed;
       if (this.isDashing) currentSpeed *= 1.85;
+      if (this.buffSpeed > 0) currentSpeed *= 1.95; // Golden Pepper Speed Boost!
 
       // Apply Mud Slowdown (if not jumping)
       if (!this.isJumping && this.isPiggyOnMud()) {
@@ -509,9 +595,9 @@ class GameScene extends Phaser.Scene {
       const trot = Math.sin(Date.now() * 0.018) * 3;
       this.piggy.y = this.gridToIso(this.piggyGrid.x, this.piggyGrid.y, this.piggyGrid.z).y + trot - (this.piggyZ * this.elevationStep);
 
-      // Emit running dust occasionally
-      if (Math.random() < 0.25) {
-        this.spawnDust(this.piggy.x, this.piggy.y + 4, 1);
+      // Emit running dust (or flame dust if speed buffed)
+      if (Math.random() < 0.28) {
+        this.spawnDust(this.piggy.x, this.piggy.y + 4, this.buffSpeed > 0 ? 3 : 1);
       }
     } else {
       // Idle breathing
@@ -545,6 +631,18 @@ class GameScene extends Phaser.Scene {
       return;
     }
 
+    // If farmer is stunned from spikes, cactus, or clone trick
+    if (this.farmerStunTimer > 0) {
+      this.farmerStunTimer -= dt;
+      this.farmer.setAngle(-12 + Math.sin(Date.now() * 0.035) * 20);
+      if (this.farmerStunTimer <= 0) {
+        this.farmerStunTimer = 0;
+        this.farmer.clearTint();
+        this.farmer.setAngle(0);
+      }
+      return;
+    }
+
     // If during head start grace period, farmer stays put and fumes!
     if (this.graceTime > 0) {
       this.farmer.setAngle(Math.sin(Date.now() * 0.035) * 10);
@@ -552,9 +650,40 @@ class GameScene extends Phaser.Scene {
     }
     this.farmer.setAngle(0);
 
-    // Distance from farmer to piggy
-    const dx = this.piggyGrid.x - this.farmerGrid.x;
-    const dy = this.piggyGrid.y - this.farmerGrid.y;
+    // Hazard Injury Check: Did the farmer hit spikes or thorns/cactus?
+    for (const obs of this.obstacles) {
+      if (obs.type === 'spikes' || obs.type === 'thorn') {
+        const d = Math.hypot(this.farmerGrid.x - obs.gridX, this.farmerGrid.y - obs.gridY);
+        if (d < 0.65) {
+          this.injureFarmer(obs.type === 'spikes' ? 'SPIKES' : 'CACTUS');
+          return;
+        }
+      }
+    }
+
+    // Target Selection: Decoy Clone vs Real Piggy
+    let targetX = this.piggyGrid.x;
+    let targetY = this.piggyGrid.y;
+    let isTargetingClone = false;
+
+    if (this.buffClone > 0 && this.cloneGrid) {
+      targetX = this.cloneGrid.x;
+      targetY = this.cloneGrid.y;
+      isTargetingClone = true;
+    } else if (this.buffInvis > 0) {
+      // Invisibility Active: Farmer cannot see Piggy!
+      const wander = Math.sin(Date.now() * 0.003) * 0.6;
+      this.farmerGrid.x += wander * 0.4 * dt;
+      this.farmer.setAngle(wander * 8);
+      if (Math.random() < 0.02) {
+        this.showFloatingText(this.farmer.x, this.farmer.y - 45, '❓ WHERE IS PIGGY?!', '#a29bfe');
+      }
+      return;
+    }
+
+    // Distance from farmer to target
+    const dx = targetX - this.farmerGrid.x;
+    const dy = targetY - this.farmerGrid.y;
     const dist = Math.hypot(dx, dy);
 
     // Speed calculation
@@ -565,7 +694,7 @@ class GameScene extends Phaser.Scene {
       speed *= 0.45;
     }
 
-    // Farmer tracks Piggy
+    // Farmer tracks target
     if (dist > 0.3) {
       const dirX = dx / dist;
       const dirY = dy / dist;
@@ -584,17 +713,26 @@ class GameScene extends Phaser.Scene {
       this.farmer.y = fIso.y + bob;
     }
 
-    // Pitchfork Warning Lunge vs Catch
-    if (dist < 0.55 && !this.isJumping) {
-      this.triggerGameOver('The farmer caught Piggy with his pitchfork!');
-    } else if (dist < 1.2 && !this.isJumping) {
-      // Pitchfork thrust warning: farmer angles towards piggy
-      this.farmer.setAngle(this.farmer.flipX ? -15 : 15);
-      if (Math.random() < 0.04) {
-        window.sounds?.playFarmerAlert();
+    // Clone catch check
+    if (isTargetingClone && dist < 0.65) {
+      this.removeClone();
+      this.injureFarmer('CLONE FOOLED');
+      return;
+    }
+
+    // Pitchfork Warning Lunge vs Catch (Only if real Piggy and not invisible)
+    if (!isTargetingClone && this.buffInvis <= 0) {
+      if (dist < 0.55 && !this.isJumping) {
+        this.triggerGameOver('The farmer caught Piggy with his pitchfork!');
+      } else if (dist < 1.2 && !this.isJumping) {
+        // Pitchfork thrust warning: farmer angles towards piggy
+        this.farmer.setAngle(this.farmer.flipX ? -15 : 15);
+        if (Math.random() < 0.04) {
+          window.sounds?.playFarmerAlert();
+        }
+      } else {
+        this.farmer.setAngle(0);
       }
-    } else {
-      this.farmer.setAngle(0);
     }
   }
 
@@ -613,32 +751,65 @@ class GameScene extends Phaser.Scene {
   }
 
   checkInteractions() {
-    // 1. Collectibles Check
+    // 1. Collectibles & Artifacts Check
     for (const item of this.items) {
       if (!item.collected) {
         const d = Math.hypot(this.piggyGrid.x - item.gridX, this.piggyGrid.y - item.gridY);
         if (d < 0.85) {
-          item.collected = true;
-          window.sounds?.playCollect();
+          if (item.type.startsWith('artifact_')) {
+            item.collected = true;
+            window.sounds?.playPowerup();
 
-          // Points based on apple type
-          let pts = 50;
-          if (item.type === 'apple_gold') pts = 150;
-          else if (item.type === 'apple_green') pts = 75;
-          else if (item.type === 'acorn') pts = 25;
+            let artData = null;
+            if (item.type === 'artifact_speed') {
+              artData = { id: 'speed', name: 'Speed Pepper', icon: '🌶️', desc: 'Blazing 2x Speed for 6s', duration: 6, key: 'artifact_speed' };
+            } else if (item.type === 'artifact_jump') {
+              artData = { id: 'jump', name: 'Winged Feather', icon: '🪽', desc: 'Super High Jump for 7s', duration: 7, key: 'artifact_jump' };
+            } else if (item.type === 'artifact_invis') {
+              artData = { id: 'invis', name: 'Smoke Cloak', icon: '👻', desc: 'Invisible to Farmer for 5s', duration: 5, key: 'artifact_invis' };
+            } else if (item.type === 'artifact_clone') {
+              artData = { id: 'clone', name: 'Mirage Decoy', icon: '🐷', desc: 'Lures Farmer away for 6s', duration: 6, key: 'artifact_clone' };
+            } else if (item.type === 'artifact_dirt') {
+              artData = { id: 'dirt', name: 'Mud Bomb', icon: '🥔', desc: 'Throw Mud to Slow Farmer (Press Q)', duration: 0, key: 'artifact_dirt' };
+            }
 
-          this.score += pts;
-          this.events.emit('updateScore', this.score);
+            if (artData) {
+              this.inventory.push(artData);
+              this.events.emit('updateInventory', this.inventory);
+              this.showFloatingText(this.piggy.x, this.piggy.y - 40, `+ ${artData.icon} ${artData.name}! [R]`, '#feca57');
+            }
 
-          // Pop tween and remove sprite
-          this.tweens.add({
-            targets: item.sprite,
-            y: item.sprite.y - 30,
-            alpha: 0,
-            scale: 1.4,
-            duration: 350,
-            onComplete: () => item.sprite.destroy()
-          });
+            this.tweens.add({
+              targets: item.sprite,
+              y: item.sprite.y - 35,
+              alpha: 0,
+              scale: 1.5,
+              duration: 350,
+              onComplete: () => item.sprite.destroy()
+            });
+          } else {
+            item.collected = true;
+            window.sounds?.playCollect();
+
+            // Points based on apple type
+            let pts = 50;
+            if (item.type === 'apple_gold') pts = 150;
+            else if (item.type === 'apple_green') pts = 75;
+            else if (item.type === 'acorn') pts = 25;
+
+            this.score += pts;
+            this.events.emit('updateScore', this.score);
+
+            // Pop tween and remove sprite
+            this.tweens.add({
+              targets: item.sprite,
+              y: item.sprite.y - 30,
+              alpha: 0,
+              scale: 1.4,
+              duration: 350,
+              onComplete: () => item.sprite.destroy()
+            });
+          }
         }
       }
     }
@@ -718,6 +889,125 @@ class GameScene extends Phaser.Scene {
         levelIndex: this.levelIndex,
         timeLeft: this.timeLeft
       });
+    });
+  }
+
+  activateArtifact(index) {
+    if (index < 0 || index >= this.inventory.length) return;
+    const art = this.inventory[index];
+    this.inventory.splice(index, 1);
+    this.events.emit('updateInventory', this.inventory);
+
+    window.sounds?.playPowerup();
+
+    if (art.id === 'speed') {
+      this.buffSpeed = 6.0;
+      this.showFloatingText(this.piggy.x, this.piggy.y - 35, '⚡ SPEED BOOST! ⚡', '#f39c12');
+    } else if (art.id === 'jump') {
+      this.buffJump = 7.0;
+      this.showFloatingText(this.piggy.x, this.piggy.y - 35, '🪽 SUPER JUMP READY! 🪽', '#00d2d3');
+    } else if (art.id === 'invis') {
+      this.buffInvis = 5.0;
+      this.piggy.setAlpha(0.35);
+      window.sounds?.playInvis();
+      this.showFloatingText(this.piggy.x, this.piggy.y - 35, '👻 INVISIBLE! 👻', '#a29bfe');
+    } else if (art.id === 'clone') {
+      this.spawnMirageClone();
+      this.showFloatingText(this.piggy.x, this.piggy.y - 35, '🐷 DECOY CLONE SPAWNED! 🐷', '#ff9ff3');
+    } else if (art.id === 'dirt') {
+      this.dropMudPatch();
+    }
+  }
+
+  dropMudPatch() {
+    // Check if player has dirt in inventory
+    const dirtIdx = this.inventory.findIndex(i => i.id === 'dirt');
+    if (dirtIdx >= 0) {
+      this.inventory.splice(dirtIdx, 1);
+      this.events.emit('updateInventory', this.inventory);
+    }
+    const gx = Math.round(this.piggyGrid.x);
+    const gy = Math.round(this.piggyGrid.y);
+    const iso = this.gridToIso(gx, gy, 0);
+
+    const mudSprite = this.add.image(iso.x, iso.y, 'mud');
+    mudSprite.setOrigin(0.5, 0.7);
+    mudSprite.setDepth(iso.y - 1);
+    this.obstaclesGroup.add(mudSprite);
+
+    this.obstacles.push({
+      type: 'mud',
+      gridX: gx,
+      gridY: gy,
+      gridZ: 0,
+      sprite: mudSprite
+    });
+
+    window.sounds?.playDirtSplat();
+    this.showFloatingText(iso.x, iso.y - 20, '🥔 MUD DROPPED!', '#835e3c');
+  }
+
+  spawnMirageClone() {
+    this.buffClone = 6.0;
+    this.cloneGrid = { x: this.piggyGrid.x, y: this.piggyGrid.y };
+    // Run diagonally away
+    this.cloneDir = { x: (Math.random() > 0.5 ? 1.6 : -1.6), y: -1.8 };
+    const iso = this.gridToIso(this.cloneGrid.x, this.cloneGrid.y, 0);
+    this.cloneSprite = this.add.sprite(iso.x, iso.y, 'piggy_clone');
+    this.cloneSprite.setOrigin(0.5, 0.85);
+    this.cloneSprite.setDepth(iso.y + 10);
+  }
+
+  updateClone(dt) {
+    if (!this.cloneSprite || !this.cloneGrid) return;
+    this.cloneGrid.x += this.cloneDir.x * dt;
+    this.cloneGrid.y += this.cloneDir.y * dt;
+    this.cloneGrid.x = Phaser.Math.Clamp(this.cloneGrid.x, 1, this.levelData.gridWidth - 2);
+    this.cloneGrid.y = Phaser.Math.Clamp(this.cloneGrid.y, 0, this.levelData.gridHeight - 1);
+    const iso = this.gridToIso(this.cloneGrid.x, this.cloneGrid.y, 0);
+    this.cloneSprite.x = iso.x;
+    this.cloneSprite.y = iso.y;
+    this.cloneSprite.setDepth(iso.y + 10);
+    this.spawnDust(iso.x, iso.y, 1);
+  }
+
+  removeClone() {
+    if (this.cloneSprite) {
+      this.spawnDust(this.cloneSprite.x, this.cloneSprite.y, 8);
+      this.cloneSprite.destroy();
+      this.cloneSprite = null;
+      this.cloneGrid = null;
+    }
+  }
+
+  injureFarmer(cause) {
+    this.farmerStunTimer = 2.4;
+    window.sounds?.playFarmerStun();
+    this.farmer.setTint(0xff3838);
+    // Knock back along Y away from hazard
+    this.farmerGrid.y -= 0.65;
+    const fIso = this.gridToIso(this.farmerGrid.x, this.farmerGrid.y, 0);
+    this.farmer.x = fIso.x;
+    this.farmer.y = fIso.y;
+    this.showFloatingText(fIso.x, fIso.y - 50, `💥 ${cause}! STUNNED!`, '#e74c3c');
+  }
+
+  showFloatingText(x, y, text, color = '#ffffff') {
+    const txt = this.add.text(x, y, text, {
+      fontFamily: 'Impact, Arial Black',
+      fontSize: '15px',
+      color: color,
+      stroke: '#000000',
+      strokeThickness: 3
+    }).setOrigin(0.5).setDepth(9999);
+
+    this.tweens.add({
+      targets: txt,
+      y: y - 32,
+      alpha: 0,
+      duration: 1200,
+      ease: 'Quad.easeOut',
+      onComplete: () => txt.destroy()
     });
   }
 }

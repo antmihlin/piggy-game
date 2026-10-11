@@ -26,10 +26,13 @@ window.GAME_LEVELS = [
     ],
     items: [
       { type: 'apple_red', x: 5, y: 4, z: 0 },
-      { type: 'apple_red', x: 5, y: 5, z: 0 },
+      { type: 'artifact_speed', x: 3, y: 6, z: 0 },
+      { type: 'artifact_jump', x: 7, y: 6, z: 0 },
       { type: 'apple_green', x: 5, y: 9, z: 0 },
+      { type: 'artifact_invis', x: 3, y: 10, z: 0 },
+      { type: 'artifact_clone', x: 7, y: 10, z: 0 },
       { type: 'apple_gold', x: 5, y: 12, z: 0 },
-      { type: 'apple_gold', x: 5, y: 13, z: 0 },
+      { type: 'artifact_dirt', x: 5, y: 14, z: 0 },
       { type: 'acorn', x: 3, y: 16, z: 0 },
       { type: 'acorn', x: 7, y: 16, z: 0 },
     ],
@@ -69,8 +72,10 @@ window.GAME_LEVELS = [
     pathX: 5, // central path
     items: [
       { type: 'apple_red', x: 5, y: 5, z: 0 },
+      { type: 'artifact_speed', x: 6, y: 7, z: 0 },
       { type: 'apple_green', x: 4, y: 8, z: 0 },
       { type: 'apple_gold', x: 7, y: 12, z: 1 },
+      { type: 'artifact_dirt', x: 4, y: 13, z: 0 },
       { type: 'acorn', x: 5, y: 15, z: 0 },
       { type: 'apple_red', x: 5, y: 18, z: 0 },
       { type: 'acorn', x: 6, y: 20, z: 0 },
@@ -111,9 +116,11 @@ window.GAME_LEVELS = [
     pathX: 6,
     items: [
       { type: 'apple_red', x: 6, y: 4, z: 0 },
+      { type: 'artifact_jump', x: 6, y: 8, z: 0 },
       { type: 'apple_gold', x: 3, y: 8, z: 1 },
       { type: 'apple_green', x: 9, y: 10, z: 1 },
       { type: 'apple_red', x: 6, y: 13, z: 0 },
+      { type: 'artifact_invis', x: 8, y: 14, z: 0 },
       { type: 'apple_gold', x: 6, y: 17, z: 0 },
       { type: 'acorn', x: 3, y: 20, z: 0 },
       { type: 'acorn', x: 9, y: 20, z: 0 },
@@ -157,7 +164,9 @@ window.GAME_LEVELS = [
     items: [
       { type: 'apple_gold', x: 7, y: 4, z: 0 },
       { type: 'apple_red', x: 5, y: 8, z: 0 },
+      { type: 'artifact_clone', x: 9, y: 9, z: 0 },
       { type: 'apple_gold', x: 7, y: 12, z: 1 },
+      { type: 'artifact_speed', x: 5, y: 14, z: 0 },
       { type: 'apple_green', x: 9, y: 16, z: 0 },
       { type: 'apple_gold', x: 7, y: 20, z: 1 },
       { type: 'acorn', x: 4, y: 24, z: 0 },

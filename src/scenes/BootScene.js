@@ -73,17 +73,27 @@ class BootScene extends Phaser.Scene {
     this.createPumpkinTexture();
     this.createRockTexture();
 
-    // 7. Collectibles
+    // 7. Collectibles & Artifacts
     this.createItemTexture('apple_red', '#e74c3c');
     this.createItemTexture('apple_gold', '#f1c40f');
     this.createItemTexture('apple_green', '#2ecc71');
     this.createAcornTexture();
+    this.createArtifactTextures();
 
     // 8. Particles
     const dust = this.make.graphics({ x: 0, y: 0, add: false });
     dust.fillStyle(0xd2b48c, 0.7);
     dust.fillCircle(8, 8, 7);
     dust.generateTexture('dust', 16, 16);
+
+    const star = this.make.graphics({ x: 0, y: 0, add: false });
+    star.fillStyle(0xf1c40f, 1);
+    star.fillTriangle(8, 0, 11, 6, 16, 6);
+    star.fillTriangle(16, 6, 12, 10, 14, 16);
+    star.fillTriangle(14, 16, 8, 12, 2, 16);
+    star.fillTriangle(2, 16, 4, 10, 0, 6);
+    star.fillTriangle(0, 6, 5, 6, 8, 0);
+    star.generateTexture('star', 16, 16);
   }
 
   createIsometricCube(key, topBright, topDark, leftColor, rightColor) {
@@ -572,5 +582,110 @@ class BootScene extends Phaser.Scene {
     g.fillRect(w / 2 - 1, 2, 2, 4);
 
     g.generateTexture('acorn', w, h);
+  }
+
+  createArtifactTextures() {
+    // 1. Artifact: Speed Boost (Golden Hot Pepper)
+    let w = 28, h = 28;
+    let g = this.make.graphics({ x: 0, y: 0, add: false });
+    g.fillStyle(0x000000, 0.25);
+    g.fillEllipse(w / 2, h - 3, 16, 6);
+    // Golden Pepper Body
+    g.fillStyle(0xff9f43, 1);
+    g.fillCircle(14, 14, 9);
+    g.fillStyle(0xff6b6b, 1);
+    g.fillCircle(14, 15, 6);
+    // Flame glow
+    g.fillStyle(0xfeca57, 1);
+    g.fillTriangle(14, 4, 19, 13, 9, 13);
+    // Green stem
+    g.fillStyle(0x1dd1a1, 1);
+    g.fillRect(13, 2, 3, 4);
+    g.generateTexture('artifact_speed', w, h);
+
+    // 2. Artifact: Long Jump (Winged Boots / Feather)
+    g = this.make.graphics({ x: 0, y: 0, add: false });
+    g.fillStyle(0x000000, 0.25);
+    g.fillEllipse(w / 2, h - 3, 16, 6);
+    // Wing
+    g.fillStyle(0x48dbfb, 1);
+    g.fillTriangle(6, 18, 22, 6, 16, 22);
+    g.fillStyle(0x0abde3, 1);
+    g.fillTriangle(10, 18, 24, 10, 18, 22);
+    // Halo glow
+    g.lineStyle(2, 0xffffff, 0.9);
+    g.strokeEllipse(14, 8, 12, 6);
+    g.generateTexture('artifact_jump', w, h);
+
+    // 3. Artifact: Invisibility Cloak / Phantom Orb
+    g = this.make.graphics({ x: 0, y: 0, add: false });
+    g.fillStyle(0x000000, 0.2);
+    g.fillEllipse(w / 2, h - 3, 14, 5);
+    // Ghostly translucent orb
+    g.fillStyle(0xa29bfe, 0.9);
+    g.fillCircle(14, 14, 9);
+    g.fillStyle(0x6c5ce7, 0.85);
+    g.fillCircle(14, 14, 6);
+    // Eye slit glow
+    g.fillStyle(0xffffff, 1);
+    g.fillCircle(11, 13, 2);
+    g.fillCircle(17, 13, 2);
+    g.generateTexture('artifact_invis', w, h);
+
+    // 4. Artifact: Mirage Clone Decoy Doll
+    g = this.make.graphics({ x: 0, y: 0, add: false });
+    g.fillStyle(0x000000, 0.25);
+    g.fillEllipse(w / 2, h - 3, 16, 6);
+    // Mini Hologram Piggy Doll
+    g.fillStyle(0xff9ff3, 1);
+    g.fillRect(8, 10, 12, 11);
+    // Red bandana
+    g.fillStyle(0xee5253, 1);
+    g.fillRect(7, 11, 14, 3);
+    // Snout
+    g.fillStyle(0xf368e0, 1);
+    g.fillRect(11, 15, 6, 4);
+    // Holographic sparkle
+    g.lineStyle(1.5, 0x54a0ff, 0.9);
+    g.strokeCircle(14, 14, 12);
+    g.generateTexture('artifact_clone', w, h);
+
+    // 5. Artifact: Mud Pouch / Dirt Bomb
+    g = this.make.graphics({ x: 0, y: 0, add: false });
+    g.fillStyle(0x000000, 0.25);
+    g.fillEllipse(w / 2, h - 3, 16, 6);
+    // Dirt pouch
+    g.fillStyle(0x835e3c, 1);
+    g.fillCircle(14, 16, 8);
+    g.fillStyle(0x573e27, 1);
+    g.fillCircle(14, 16, 5);
+    // Pouch neck / tie
+    g.fillStyle(0xdfe6e9, 1);
+    g.fillRect(12, 7, 4, 3);
+    g.fillStyle(0x704825, 1);
+    g.fillTriangle(11, 8, 17, 8, 14, 4);
+    g.generateTexture('artifact_dirt', w, h);
+
+    // 6. Hologram Decoy Clone Sprite (Used when Mirage Clone is active)
+    w = 48; h = 48;
+    g = this.make.graphics({ x: 0, y: 0, add: false });
+    g.fillStyle(0x00d2d3, 0.35);
+    g.fillEllipse(w / 2, h - 5, 26, 10);
+    // Cyan holographic body
+    g.fillStyle(0x00d2d3, 0.7);
+    g.fillRect(12, 14, 20, 20);
+    g.lineStyle(1.5, 0x54a0ff, 0.9);
+    g.strokeRect(12, 14, 20, 20);
+    // Red headband
+    g.fillStyle(0xff6b6b, 0.85);
+    g.fillRect(10, 15, 24, 6);
+    // Snout
+    g.fillStyle(0x01a3a4, 0.85);
+    g.fillRect(20, 24, 8, 5);
+    // Glowing eyes
+    g.fillStyle(0xffffff, 1);
+    g.fillRect(16, 19, 4, 3);
+    g.fillRect(28, 19, 4, 3);
+    g.generateTexture('piggy_clone', w, h);
   }
 }
