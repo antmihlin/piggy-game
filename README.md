@@ -43,7 +43,7 @@ An optimized 2.5D isometric voxel browser game built with **Phaser 3**, featurin
    - Choose your challenge level directly from the main menu:
      - 🟢 **Easy (Piglet):** Farmer speed reduced by 20%, longer hazard stun duration (3.5s), and extra reaction grace time.
      - 🟡 **Normal (Runner):** Standard balanced speed and obstacle layout (2.4s stun).
-     - 🔴 **Hard (Farmer Frenzy):** Farmer speed boosted by 25%, shorter reaction grace (1.6s), quick hazard recovery (1.5s stun), plus **extra barriers, alternating spike rows, cactus hazards, and mud pits dynamically injected along the escape path!**
+     - 🔴 **Hard (Farmer Frenzy):** Farmer speed boosted by 25%, shorter reaction grace (1.6s), quick hazard recovery (1.5s stun), **the Farmer can JUMP and vault over spikes, cacti, and mud**, plus **extra barriers, alternating spike rows, cactus hazards, and mud pits dynamically injected along the escape path!**
 
 4. **🎨 Pixelated Arcade Menu & UI:**
    - Authentic voxel sunset main menu art featuring Piggy running from the pitchfork-wielding farmer.

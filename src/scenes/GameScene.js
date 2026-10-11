@@ -48,6 +48,10 @@ class GameScene extends Phaser.Scene {
     this.farmerSpeed = (this.levelData.farmerSpeed || 82) * (this.levelData.isTraining ? 0 : speedMult);
     this.farmerMudSlow = 0;
     this.farmerStunTimer = 0;
+    this.farmerZ = 0;
+    this.farmerVZ = 0;
+    this.isFarmerJumping = false;
+    this.farmerJumpCooldown = 0;
 
     // Inventory and Buffs & Time Slow-motion
     this.inventory = [];
@@ -548,8 +552,9 @@ class GameScene extends Phaser.Scene {
     // Handle Piggy Vertical Jump Physics (Z axis)
     this.handlePiggyJump(dt);
 
-    // Handle Farmer AI Chase
+    // Handle Farmer AI Chase & Vertical Jump Physics
     this.handleFarmerAI(dt);
+    this.handleFarmerJump(dt);
 
     // Update Depths for Proper 2.5D Isometric Sorting
     this.piggy.setDepth(this.piggy.y + 10);
@@ -672,6 +677,23 @@ class GameScene extends Phaser.Scene {
     }
   }
 
+  handleFarmerJump(dt) {
+    if (this.isFarmerJumping) {
+      this.farmerZ += this.farmerVZ * dt;
+      this.farmerVZ -= 16.0 * dt; // gravity
+
+      if (this.farmerZ <= 0) {
+        this.farmerZ = 0;
+        this.farmerVZ = 0;
+        this.isFarmerJumping = false;
+        this.spawnDust(this.farmer.x, this.farmer.y, 4);
+      }
+    }
+    if (this.farmerJumpCooldown > 0) {
+      this.farmerJumpCooldown -= dt;
+    }
+  }
+
   handleFarmerAI(dt) {
     // In training mode, the farmer is asleep
     if (this.levelData.isTraining) {
@@ -698,13 +720,18 @@ class GameScene extends Phaser.Scene {
     }
     this.farmer.setAngle(0);
 
+    const isAirborne = this.isFarmerJumping && this.farmerZ > 0.35;
+
     // Hazard Injury Check: Did the farmer hit spikes or thorns/cactus?
-    for (const obs of this.obstacles) {
-      if (obs.type === 'spikes' || obs.type === 'thorn') {
-        const d = Math.hypot(this.farmerGrid.x - obs.gridX, this.farmerGrid.y - obs.gridY);
-        if (d < 0.65) {
-          this.injureFarmer(obs.type === 'spikes' ? 'SPIKES' : 'CACTUS');
-          return;
+    // If airborne, farmer vaults cleanly over the hazard safely!
+    if (!isAirborne) {
+      for (const obs of this.obstacles) {
+        if (obs.type === 'spikes' || obs.type === 'thorn') {
+          const d = Math.hypot(this.farmerGrid.x - obs.gridX, this.farmerGrid.y - obs.gridY);
+          if (d < 0.65) {
+            this.injureFarmer(obs.type === 'spikes' ? 'SPIKES' : 'CACTUS');
+            return;
+          }
         }
       }
     }
@@ -734,11 +761,39 @@ class GameScene extends Phaser.Scene {
     const dy = targetY - this.farmerGrid.y;
     const dist = Math.hypot(dx, dy);
 
+    // ========================================================
+    // HARD MODE: Farmer leaps over upcoming obstacles in his path!
+    // ========================================================
+    if (this.difficulty === 'hard' && !this.isFarmerJumping && this.farmerJumpCooldown <= 0 && dist > 0.4) {
+      const moveDirX = dx / dist;
+      const moveDirY = dy / dist;
+
+      for (const obs of this.obstacles) {
+        if (obs.type === 'spikes' || obs.type === 'thorn' || obs.type === 'mud' || obs.type === 'hay_spring') {
+          const toObsX = obs.gridX - this.farmerGrid.x;
+          const toObsY = obs.gridY - this.farmerGrid.y;
+          const obsDist = Math.hypot(toObsX, toObsY);
+
+          // Dot product: checks if obstacle is along the farmer's heading
+          const dot = toObsX * moveDirX + toObsY * moveDirY;
+          if (obsDist < 1.45 && dot > 0.35) {
+            this.isFarmerJumping = true;
+            this.farmerVZ = 7.8; // High athletic leap
+            this.farmerJumpCooldown = 1.35;
+            window.sounds?.playJump();
+            this.spawnDust(this.farmer.x, this.farmer.y, 5);
+            this.showFloatingText(this.farmer.x, this.farmer.y - 42, '🦘 VAULT!', '#ff4757');
+            break;
+          }
+        }
+      }
+    }
+
     // Speed calculation
     let speed = (this.farmerSpeed / 30); // scale to grid units/sec
 
-    // Mud check for Farmer
-    if (this.isEntityOnMud(this.farmerGrid.x, this.farmerGrid.y)) {
+    // Mud check for Farmer (only if not jumping over it)
+    if (this.isEntityOnMud(this.farmerGrid.x, this.farmerGrid.y) && !isAirborne) {
       speed *= 0.45;
     }
 
@@ -751,14 +806,29 @@ class GameScene extends Phaser.Scene {
       this.farmerGrid.y += dirY * speed * dt;
 
       // Facing
-      if (dirX > 0) this.farmer.setFlipX(false);
-      else if (dirX < 0) this.farmer.setFlipX(true);
+      if (dirX > 0) {
+        this.farmer.setFlipX(false);
+        this.farmerFacing = 1;
+      } else if (dirX < 0) {
+        this.farmer.setFlipX(true);
+        this.farmerFacing = -1;
+      }
 
-      // Footstep walk bob
-      const bob = Math.sin(Date.now() * 0.015) * 3;
-      const fIso = this.gridToIso(this.farmerGrid.x, this.farmerGrid.y, this.farmerGrid.z);
+      // Footstep walk bob vs jump elevation
+      const bob = isAirborne ? 0 : Math.sin(Date.now() * 0.015) * 3;
+      const fIso = this.gridToIso(this.farmerGrid.x, this.farmerGrid.y, this.farmerGrid.z || 0);
       this.farmer.x = fIso.x;
-      this.farmer.y = fIso.y + bob;
+      this.farmer.y = fIso.y + bob - (this.farmerZ * this.elevationStep);
+
+      // Pitchfork thrust effect follows farmer
+      if (this.pitchforkGlow) {
+        this.pitchforkGlow.setDepth(this.farmer.y + 2);
+      }
+
+      if (isAirborne) {
+        // Dynamic forward athletic tilt while leaping
+        this.farmer.setAngle((this.farmerFacing || 1) * 14);
+      }
     }
 
     // Clone catch check
@@ -770,15 +840,16 @@ class GameScene extends Phaser.Scene {
 
     // Pitchfork Warning Lunge vs Catch (Only if real Piggy and not invisible)
     if (!isTargetingClone && this.buffInvis <= 0) {
-      if (dist < 0.55 && !this.isJumping) {
+      const zDiff = Math.abs(this.farmerZ - (this.piggyZ || 0));
+      if (dist < 0.55 && zDiff < 0.85) {
         this.triggerGameOver('The farmer caught Piggy with his pitchfork!');
-      } else if (dist < 1.2 && !this.isJumping) {
+      } else if (dist < 1.2 && !isAirborne) {
         // Pitchfork thrust warning: farmer angles towards piggy
         this.farmer.setAngle(this.farmer.flipX ? -15 : 15);
         if (Math.random() < 0.04) {
           window.sounds?.playFarmerAlert();
         }
-      } else {
+      } else if (!isAirborne) {
         this.farmer.setAngle(0);
       }
     }
