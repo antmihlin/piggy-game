@@ -35,6 +35,17 @@ class LevelPreviewScene extends Phaser.Scene {
     // Create UI Overlay (Tabs, Stats Card, Play & Back Buttons)
     this.createUIOverlay(width, height);
 
+    const resizeHandler = () => {
+      this.scene.restart({
+        levelIndex: this.currentLevelIndex,
+        difficulty: this.difficulty
+      });
+    };
+    this.scale.on('resize', resizeHandler);
+    this.events.once('shutdown', () => {
+      this.scale.off('resize', resizeHandler);
+    });
+
     window.sounds?.playOink();
   }
 

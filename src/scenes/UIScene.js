@@ -23,11 +23,11 @@ class UIScene extends Phaser.Scene {
     this.isInventoryOpen = false;
 
     // 1. Top HUD Bar Background
-    const hudBg = this.add.graphics();
-    hudBg.fillStyle(0x000000, 0.55);
-    hudBg.fillRoundedRect(12, 10, width - 24, 56, 10);
-    hudBg.lineStyle(2, 0x57606f, 0.8);
-    hudBg.strokeRoundedRect(12, 10, width - 24, 56, 10);
+    this.hudBg = this.add.graphics();
+    this.hudBg.fillStyle(0x000000, 0.55);
+    this.hudBg.fillRoundedRect(12, 10, width - 24, 56, 10);
+    this.hudBg.lineStyle(2, 0x57606f, 0.8);
+    this.hudBg.strokeRoundedRect(12, 10, width - 24, 56, 10);
 
     // 2. Main Menu Button (Top Left)
     this.createHudButton(24, 20, 84, 36, '🏠 MENU', 0x2f3542, () => {
@@ -147,6 +147,11 @@ class UIScene extends Phaser.Scene {
     // Keyboard ESC or R to toggle/close inventory
     this.input.keyboard.on('keydown-ESC', () => {
       if (this.isInventoryOpen) this.toggleInventory();
+    });
+
+    // Responsive resize listener for mobile landscape and window resizing
+    this.scale.on('resize', (gameSize) => {
+      this.repositionUI(gameSize.width, gameSize.height);
     });
 
     this.events.on('shutdown', () => {
@@ -524,58 +529,92 @@ class UIScene extends Phaser.Scene {
     // JUMP Button (Right)
     const jumpX = width - 85;
     const jumpY = height - 90;
-    const jumpBtn = this.add.container(jumpX, jumpY).setDepth(3000);
+    this.jumpBtn = this.add.container(jumpX, jumpY).setDepth(3000);
 
     const jumpG = this.add.graphics();
     jumpG.fillStyle(0x10ac84, 0.9);
     jumpG.fillCircle(0, 0, 36);
     jumpG.lineStyle(2.5, 0x1dd1a1, 1);
     jumpG.strokeCircle(0, 0, 36);
-    jumpBtn.add(jumpG);
+    this.jumpBtn.add(jumpG);
 
     const jumpText = this.add.text(0, -1, 'JUMP', {
       fontFamily: '"Press Start 2P", monospace',
       fontSize: '11px',
       color: '#ffffff'
     }).setOrigin(0.5);
-    jumpBtn.add(jumpText);
+    this.jumpBtn.add(jumpText);
 
-    jumpBtn.setSize(72, 72);
-    jumpBtn.setInteractive({ useHandCursor: true });
-    jumpBtn.on('pointerdown', () => {
-      jumpBtn.setScale(0.92);
+    this.jumpBtn.setSize(72, 72);
+    this.jumpBtn.setInteractive({ useHandCursor: true });
+    this.jumpBtn.on('pointerdown', () => {
+      this.jumpBtn.setScale(0.92);
       this.gameScene?.requestJump();
     });
-    jumpBtn.on('pointerup', () => jumpBtn.setScale(1.0));
-    jumpBtn.on('pointerout', () => jumpBtn.setScale(1.0));
+    this.jumpBtn.on('pointerup', () => this.jumpBtn.setScale(1.0));
+    this.jumpBtn.on('pointerout', () => this.jumpBtn.setScale(1.0));
 
     // DASH Button (Left of Jump)
     const dashX = width - 175;
     const dashY = height - 75;
-    const dashBtn = this.add.container(dashX, dashY).setDepth(3000);
+    this.dashBtn = this.add.container(dashX, dashY).setDepth(3000);
 
     const dashG = this.add.graphics();
     dashG.fillStyle(0xee5253, 0.9);
     dashG.fillCircle(0, 0, 28);
     dashG.lineStyle(2.5, 0xff6b6b, 1);
     dashG.strokeCircle(0, 0, 28);
-    dashBtn.add(dashG);
+    this.dashBtn.add(dashG);
 
     const dashText = this.add.text(0, -1, 'DASH', {
       fontFamily: '"Press Start 2P", monospace',
       fontSize: '9px',
       color: '#ffffff'
     }).setOrigin(0.5);
-    dashBtn.add(dashText);
+    this.dashBtn.add(dashText);
 
-    dashBtn.setSize(56, 56);
-    dashBtn.setInteractive({ useHandCursor: true });
-    dashBtn.on('pointerdown', () => {
-      dashBtn.setScale(0.92);
+    this.dashBtn.setSize(56, 56);
+    this.dashBtn.setInteractive({ useHandCursor: true });
+    this.dashBtn.on('pointerdown', () => {
+      this.dashBtn.setScale(0.92);
       this.gameScene?.requestDash();
     });
-    dashBtn.on('pointerup', () => dashBtn.setScale(1.0));
-    dashBtn.on('pointerout', () => dashBtn.setScale(1.0));
+    this.dashBtn.on('pointerup', () => this.dashBtn.setScale(1.0));
+    this.dashBtn.on('pointerout', () => this.dashBtn.setScale(1.0));
+  }
+
+  repositionUI(w, h) {
+    if (this.hudBg) {
+      this.hudBg.clear();
+      this.hudBg.fillStyle(0x000000, 0.55);
+      this.hudBg.fillRoundedRect(12, 10, w - 24, 56, 10);
+      this.hudBg.lineStyle(2, 0x57606f, 0.8);
+      this.hudBg.strokeRoundedRect(12, 10, w - 24, 56, 10);
+    }
+    if (this.timeText) this.timeText.x = w / 2 - 35;
+    if (this.diffBadge) this.diffBadge.x = w / 2 + 55;
+    if (this.bagBtn) this.bagBtn.x = w - 250;
+    if (this.dashText) this.dashText.x = w - 24;
+    if (this.buffsContainer) this.buffsContainer.x = w / 2;
+    if (this.inventoryModal) {
+      this.inventoryModal.x = w / 2;
+      this.inventoryModal.y = h / 2;
+    }
+    if (this.radarBg) {
+      this.radarBg.destroy();
+      this.farmerIcon?.destroy();
+      this.piggyIcon?.destroy();
+      this.goalIcon?.destroy();
+      this.createTensionRadar(w);
+    }
+    if (this.jumpBtn) {
+      this.jumpBtn.x = w - 85;
+      this.jumpBtn.y = h - 90;
+    }
+    if (this.dashBtn) {
+      this.dashBtn.x = w - 175;
+      this.dashBtn.y = h - 75;
+    }
   }
 
   showGameOverModal(reason) {

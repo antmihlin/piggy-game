@@ -182,7 +182,7 @@ class GameScene extends Phaser.Scene {
     // Distant sky backdrop
     const sky = this.add.graphics().setScrollFactor(0);
     sky.fillGradientStyle(0x74b9ff, 0x74b9ff, 0xa1c4fd, 0xc2e9fb, 1);
-    sky.fillRect(0, 0, w, h);
+    sky.fillRect(0, 0, Math.max(w, 2500), Math.max(h, 1500));
 
     // Parallax Mountain Silhouettes (matching background in world tilesheet)
     this.bgHills = this.add.graphics().setScrollFactor(0.08);

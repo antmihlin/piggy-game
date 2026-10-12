@@ -312,6 +312,18 @@ class MenuScene extends Phaser.Scene {
       color: '#dcdde1',
       align: 'center'
     }).setOrigin(0.5);
+
+    // Responsive auto-recenter on mobile rotation / window resize
+    const resizeHandler = () => {
+      this.scene.restart({
+        levelIndex: this.selectedLevelIndex,
+        difficulty: this.selectedDifficulty
+      });
+    };
+    this.scale.on('resize', resizeHandler);
+    this.events.once('shutdown', () => {
+      this.scale.off('resize', resizeHandler);
+    });
   }
 
   // Draw an authentic stepped-corner arcade voxel pixel box
