@@ -15,12 +15,14 @@ An optimized 2.5D isometric voxel browser game built with **Phaser 3**, featurin
 - **Quick Artifact Hotkeys:** `1`–`5` (activate inventory slots instantly)
 - **Return to Menu:** Click `🏠 MENU` in the top-left HUD (or press `ESC` in inventory)
 
-### 📱 Mobile & Touch Controls
-- **Move:** Responsive on-screen 4-way D-Pad
-- **Jump:** Green `JUMP` button
-- **Dash:** Red `DASH` button
-- **Inventory:** Tap `🎒 BAG` button to view and use items
-- **Menu:** Tap `🏠 MENU` button to exit level anytime
+### 📱 Mobile & Tablet Controls (Visible on Touch Devices Only)
+- **16:9 Display & Closer Zoom:** Automatically fits any screen in 16:9 aspect ratio with a closer camera zoom (1.45×) so Piggy and the world are large and easy to see.
+- **Move:** Virtual Analog Joystick (smooth emerald dot you drag in any direction with automatic spring-back).
+- **Jump:** Circular green `JUMP` button.
+- **Dash:** Circular red `DASH` button.
+- **Inventory:** Tap `🎒 BAG` button to view and use items in slow motion.
+- **Menu:** Tap `🏠 MENU` button to return to the menu anytime.
+*(Note: Touch joystick and action buttons automatically hide on desktop computers for a clean, full-screen view!)*
 
 ---
 
@@ -43,7 +45,7 @@ An optimized 2.5D isometric voxel browser game built with **Phaser 3**, featurin
    - Choose your challenge level directly from the main menu:
      - 🟢 **Easy (Piglet):** Farmer speed reduced by 20%, longer hazard stun duration (3.5s), and extra reaction grace time.
      - 🟡 **Normal (Runner):** Standard balanced speed and obstacle layout (2.4s stun).
-     - 🔴 **Hard (Farmer Frenzy):** Farmer speed boosted by 25%, shorter reaction grace (1.6s), quick hazard recovery (1.5s stun), **the Farmer can JUMP and vault over spikes, cacti, and mud**, plus **extra barriers, alternating spike rows, cactus hazards, and mud pits dynamically injected along the escape path!**
+     - 🔴 **Hard (Farmer Frenzy):** Farmer speed boosted by 25%, shorter reaction grace (1.6s), quick hazard recovery (1.5s stun), plus **extra barriers, alternating spike rows, cactus hazards, and mud pits dynamically injected along the escape path!**
 
 4. **🎨 Pixelated Arcade Menu & UI:**
    - Authentic voxel sunset main menu art featuring Piggy running from the pitchfork-wielding farmer.

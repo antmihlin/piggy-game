@@ -155,7 +155,7 @@ class MenuScene extends Phaser.Scene {
     const diffOptions = [
       { id: 'easy', label: '🟢 EASY', col: 0x27ae60, high: 0x2ecc71, desc: 'CHILL PACE: Farmer -20% speed | 3.5s Stun duration' },
       { id: 'normal', label: '🟡 NORMAL', col: 0xd35400, high: 0xf39c12, desc: 'BALANCED RUN: Standard chase & obstacle density' },
-      { id: 'hard', label: '🔴 HARD', col: 0xc0392b, high: 0xe74c3c, desc: 'FRENZY: Farmer +25% speed, JUMPS obstacles, extra traps!' }
+      { id: 'hard', label: '🔴 HARD', col: 0xc0392b, high: 0xe74c3c, desc: 'FRENZY: Farmer +25% speed | Extra barriers & mud traps!' }
     ];
 
     this.diffButtons = [];
@@ -281,7 +281,7 @@ class MenuScene extends Phaser.Scene {
     // ==========================================
     const isMobile = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0) || (window.innerWidth <= 900);
     const controlsHelp = isMobile
-      ? '📱 TOUCH D-PAD TO MOVE | TAP JUMP & DASH'
+      ? '📱 DRAG JOYSTICK TO MOVE | TAP JUMP & DASH'
       : '⌨️ WASD/ARROWS: MOVE | SPACE: JUMP | SHIFT: DASH | R: INVENTORY';
 
     this.add.text(width / 2, height * 0.945, controlsHelp, {

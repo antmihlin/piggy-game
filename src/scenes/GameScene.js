@@ -63,8 +63,9 @@ class GameScene extends Phaser.Scene {
     this.cloneGrid = null;
     this.cloneSprite = null;
 
-    // Touch controls input state
+    // Touch controls input state & Analog Touch Joystick
     this.touchInput = { up: false, down: false, left: false, right: false };
+    this.touchJoystick = { x: 0, y: 0, active: false };
   }
 
   create() {
@@ -425,8 +426,16 @@ class GameScene extends Phaser.Scene {
 
   setupCamera() {
     const cam = this.cameras.main;
-    cam.startFollow(this.piggy, true, 0.08, 0.08, 0, 40);
-    cam.setZoom(1.15);
+    cam.startFollow(this.piggy, true, 0.08, 0.08, 0, 30);
+
+    const isMobileOrTablet = ('ontouchstart' in window) || 
+      (navigator.maxTouchPoints > 0) || 
+      (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) ||
+      (window.innerWidth <= 850);
+
+    // On mobile / tablet, zoom in more (1.45) so Piggy, hazards, and items are clearly visible
+    const defaultZoom = isMobileOrTablet ? 1.45 : 1.15;
+    cam.setZoom(defaultZoom);
   }
 
   requestJump() {
@@ -572,6 +581,12 @@ class GameScene extends Phaser.Scene {
   handlePiggyMovement(dt) {
     let dx = 0;
     let dy = 0;
+
+    // Analog Touch Joystick Input (Mobile/Tablet dragging dot)
+    if (this.touchJoystick && this.touchJoystick.active) {
+      dx += this.touchJoystick.x;
+      dy += this.touchJoystick.y;
+    }
 
     // Keyboard Inputs (WASD & Arrows)
     const k = this.keys;

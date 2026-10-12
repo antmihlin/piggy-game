@@ -388,47 +388,185 @@ class UIScene extends Phaser.Scene {
   }
 
   setupTouchControls() {
-    const touchEl = document.getElementById('touch-controls');
-    if (!touchEl) return;
+    // Only display touch controls on mobile or tablet devices
+    const isMobileOrTablet = ('ontouchstart' in window) || 
+      (navigator.maxTouchPoints > 0) || 
+      (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) ||
+      (window.innerWidth <= 900);
 
-    const isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
-    if (isTouch || window.innerWidth <= 900) {
-      touchEl.classList.remove('hidden');
+    if (!isMobileOrTablet) {
+      // Desktop user: no on-screen touch controls needed!
+      return;
     }
 
-    const btnUp = document.getElementById('btn-up');
-    const btnDown = document.getElementById('btn-down');
-    const btnLeft = document.getElementById('btn-left');
-    const btnRight = document.getElementById('btn-right');
-    const btnJump = document.getElementById('btn-jump');
-    const btnDash = document.getElementById('btn-dash');
+    const width = this.cameras.main.width;
+    const height = this.cameras.main.height;
 
-    const bindTouch = (el, pressAction, releaseAction) => {
-      if (!el) return;
-      el.addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        pressAction();
-      });
-      el.addEventListener('touchend', (e) => {
-        e.preventDefault();
-        releaseAction();
-      });
-      el.addEventListener('mousedown', (e) => {
-        pressAction();
-      });
-      el.addEventListener('mouseup', (e) => {
-        releaseAction();
-      });
+    // ==========================================
+    // 1. VIRTUAL JOYSTICK (Bottom-Left Dot Drag)
+    // ==========================================
+    const joyBaseX = 100;
+    const joyBaseY = height - 90;
+    const joyMaxRadius = 45;
+
+    this.joystickContainer = this.add.container(joyBaseX, joyBaseY).setDepth(3000);
+
+    // Outer boundary ring
+    const baseG = this.add.graphics();
+    baseG.fillStyle(0x000000, 0.4);
+    baseG.fillCircle(0, 0, 56);
+    baseG.lineStyle(2.5, 0x57606f, 0.85);
+    baseG.strokeCircle(0, 0, 56);
+
+    // Directional hint tick marks
+    baseG.fillStyle(0xffffff, 0.25);
+    baseG.fillRect(-2, -50, 4, 10); // up
+    baseG.fillRect(-2, 40, 4, 10);  // down
+    baseG.fillRect(-50, -2, 10, 4); // left
+    baseG.fillRect(40, -2, 10, 4);  // right
+    this.joystickContainer.add(baseG);
+
+    // Center resting dot
+    const centerDot = this.add.graphics();
+    centerDot.fillStyle(0xffffff, 0.35);
+    centerDot.fillCircle(0, 0, 5);
+    this.joystickContainer.add(centerDot);
+
+    // Draggable Knob / Stick Dot
+    this.joystickKnob = this.add.container(0, 0);
+    const knobG = this.add.graphics();
+    // 3D Shadow
+    knobG.fillStyle(0x000000, 0.4);
+    knobG.fillCircle(0, 3, 24);
+    // Green face
+    knobG.fillStyle(0x2ed573, 0.92);
+    knobG.fillCircle(0, 0, 23);
+    // Bright highlight rim
+    knobG.lineStyle(2.5, 0xffffff, 0.95);
+    knobG.strokeCircle(0, 0, 23);
+    // Core highlight
+    knobG.fillStyle(0x7bed9f, 0.85);
+    knobG.fillCircle(-4, -4, 8);
+    this.joystickKnob.add(knobG);
+    this.joystickContainer.add(this.joystickKnob);
+
+    // Wide hit area for thumb dragging
+    const hitZone = this.add.circle(0, 0, 80, 0x000000, 0.001);
+    hitZone.setInteractive({ useHandCursor: true });
+    this.joystickContainer.add(hitZone);
+
+    let activeTouchId = null;
+
+    const updateKnobPos = (pointer) => {
+      const lx = pointer.x - joyBaseX;
+      const ly = pointer.y - joyBaseY;
+      const dist = Math.hypot(lx, ly);
+      const angle = Math.atan2(ly, lx);
+      const clampedDist = Math.min(dist, joyMaxRadius);
+
+      const kx = Math.cos(angle) * clampedDist;
+      const ky = Math.sin(angle) * clampedDist;
+
+      this.joystickKnob.x = kx;
+      this.joystickKnob.y = ky;
+
+      const normX = kx / joyMaxRadius;
+      const normY = ky / joyMaxRadius;
+
+      if (this.gameScene) {
+        this.gameScene.touchJoystick = { x: normX, y: normY, active: true };
+      }
     };
 
-    if (this.gameScene) {
-      bindTouch(btnUp, () => { this.gameScene.touchInput.up = true; }, () => { this.gameScene.touchInput.up = false; });
-      bindTouch(btnDown, () => { this.gameScene.touchInput.down = true; }, () => { this.gameScene.touchInput.down = false; });
-      bindTouch(btnLeft, () => { this.gameScene.touchInput.left = true; }, () => { this.gameScene.touchInput.left = false; });
-      bindTouch(btnRight, () => { this.gameScene.touchInput.right = true; }, () => { this.gameScene.touchInput.right = false; });
-      bindTouch(btnJump, () => { this.gameScene.requestJump(); }, () => {});
-      bindTouch(btnDash, () => { this.gameScene.requestDash(); }, () => {});
-    }
+    const resetKnob = () => {
+      activeTouchId = null;
+      this.tweens.add({
+        targets: this.joystickKnob,
+        x: 0,
+        y: 0,
+        duration: 120,
+        ease: 'Back.easeOut'
+      });
+      if (this.gameScene) {
+        this.gameScene.touchJoystick = { x: 0, y: 0, active: false };
+      }
+    };
+
+    hitZone.on('pointerdown', (pointer) => {
+      activeTouchId = pointer.id;
+      updateKnobPos(pointer);
+    });
+
+    this.input.on('pointermove', (pointer) => {
+      if (activeTouchId !== null && pointer.id === activeTouchId) {
+        updateKnobPos(pointer);
+      }
+    });
+
+    this.input.on('pointerup', (pointer) => {
+      if (activeTouchId !== null && pointer.id === activeTouchId) {
+        resetKnob();
+      }
+    });
+
+    // ==========================================
+    // 2. MOBILE ACTION BUTTONS (Bottom-Right)
+    // ==========================================
+    // JUMP Button (Right)
+    const jumpX = width - 85;
+    const jumpY = height - 90;
+    const jumpBtn = this.add.container(jumpX, jumpY).setDepth(3000);
+
+    const jumpG = this.add.graphics();
+    jumpG.fillStyle(0x10ac84, 0.9);
+    jumpG.fillCircle(0, 0, 36);
+    jumpG.lineStyle(2.5, 0x1dd1a1, 1);
+    jumpG.strokeCircle(0, 0, 36);
+    jumpBtn.add(jumpG);
+
+    const jumpText = this.add.text(0, -1, 'JUMP', {
+      fontFamily: '"Press Start 2P", monospace',
+      fontSize: '11px',
+      color: '#ffffff'
+    }).setOrigin(0.5);
+    jumpBtn.add(jumpText);
+
+    jumpBtn.setSize(72, 72);
+    jumpBtn.setInteractive({ useHandCursor: true });
+    jumpBtn.on('pointerdown', () => {
+      jumpBtn.setScale(0.92);
+      this.gameScene?.requestJump();
+    });
+    jumpBtn.on('pointerup', () => jumpBtn.setScale(1.0));
+    jumpBtn.on('pointerout', () => jumpBtn.setScale(1.0));
+
+    // DASH Button (Left of Jump)
+    const dashX = width - 175;
+    const dashY = height - 75;
+    const dashBtn = this.add.container(dashX, dashY).setDepth(3000);
+
+    const dashG = this.add.graphics();
+    dashG.fillStyle(0xee5253, 0.9);
+    dashG.fillCircle(0, 0, 28);
+    dashG.lineStyle(2.5, 0xff6b6b, 1);
+    dashG.strokeCircle(0, 0, 28);
+    dashBtn.add(dashG);
+
+    const dashText = this.add.text(0, -1, 'DASH', {
+      fontFamily: '"Press Start 2P", monospace',
+      fontSize: '9px',
+      color: '#ffffff'
+    }).setOrigin(0.5);
+    dashBtn.add(dashText);
+
+    dashBtn.setSize(56, 56);
+    dashBtn.setInteractive({ useHandCursor: true });
+    dashBtn.on('pointerdown', () => {
+      dashBtn.setScale(0.92);
+      this.gameScene?.requestDash();
+    });
+    dashBtn.on('pointerup', () => dashBtn.setScale(1.0));
+    dashBtn.on('pointerout', () => dashBtn.setScale(1.0));
   }
 
   showGameOverModal(reason) {

@@ -5,10 +5,13 @@ window.addEventListener('load', () => {
     type: Phaser.AUTO,
     parent: 'game-container',
     width: 960,
-    height: 640,
+    height: 540,
     scale: {
       mode: Phaser.Scale.FIT,
       autoCenter: Phaser.Scale.CENTER_BOTH
+    },
+    input: {
+      activePointers: 3
     },
     render: {
       pixelArt: true,
