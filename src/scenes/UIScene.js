@@ -37,8 +37,17 @@ class UIScene extends Phaser.Scene {
       this.scene.start('MenuScene', { levelIndex: this.levelIndex, difficulty: this.difficulty });
     });
 
+    // 2b. Fullscreen Toggle Button
+    this.createHudButton(114, 20, 42, 36, '⛶', 0x2f3542, () => {
+      if (this.scale.isFullscreen) {
+        this.scale.stopFullscreen();
+      } else {
+        this.scale.startFullscreen();
+      }
+    });
+
     // 3. Score Display
-    this.scoreText = this.add.text(125, 28, '⭐ 0', {
+    this.scoreText = this.add.text(168, 28, '⭐ 0', {
       fontFamily: '"Press Start 2P", monospace',
       fontSize: '12px',
       color: '#f1c40f'

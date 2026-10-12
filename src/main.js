@@ -4,11 +4,12 @@ window.addEventListener('load', () => {
   const config = {
     type: Phaser.AUTO,
     parent: 'game-container',
-    width: 960,
-    height: 540,
     scale: {
       mode: Phaser.Scale.FIT,
-      autoCenter: Phaser.Scale.CENTER_BOTH
+      parent: 'game-container',
+      autoCenter: Phaser.Scale.CENTER_BOTH,
+      width: 960,
+      height: 540
     },
     input: {
       activePointers: 3
@@ -29,4 +30,15 @@ window.addEventListener('load', () => {
   };
 
   window.game = new Phaser.Game(config);
+
+  // Auto-refresh scaling on window resize and mobile orientation change
+  window.addEventListener('resize', () => {
+    window.game?.scale?.refresh();
+  });
+
+  window.addEventListener('orientationchange', () => {
+    setTimeout(() => {
+      window.game?.scale?.refresh();
+    }, 200);
+  });
 });
