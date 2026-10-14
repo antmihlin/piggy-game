@@ -155,70 +155,9 @@ class BootScene extends Phaser.Scene {
   }
 
   createPiggyTexture() {
-    const w = 48;
-    const h = 48;
-    const g = this.make.graphics({ x: 0, y: 0, add: false });
-
-    // Drop shadow (3D ground contact)
-    g.fillStyle(0x000000, 0.28);
-    g.fillEllipse(w / 2, h - 5, 26, 10);
-
-    // Voxel Body (Cubic Pink)
-    const pinkMain = 0xff99bb;
-    const pinkShadow = 0xe07297;
-    const pinkHighlight = 0xffb3cc;
-
-    // Body cube
-    g.fillStyle(pinkShadow, 1);
-    g.fillRect(14, 16, 20, 22);
-    g.fillStyle(pinkMain, 1);
-    g.fillRect(12, 14, 20, 20);
-
-    // Ears
-    g.fillStyle(pinkShadow, 1);
-    g.fillRect(11, 10, 6, 7);
-    g.fillRect(27, 10, 6, 7);
-    g.fillStyle(pinkHighlight, 1);
-    g.fillRect(12, 11, 4, 5);
-    g.fillRect(28, 11, 4, 5);
-
-    // Red Ninja Headband (Signature characteristic!)
-    g.fillStyle(0xd63031, 1);
-    g.fillRect(10, 15, 24, 6);
-    // Headband ribbon tails flying backwards
-    g.beginPath();
-    g.moveTo(10, 17);
-    g.lineTo(1, 13);
-    g.lineTo(3, 21);
-    g.lineTo(10, 20);
-    g.closePath();
-    g.fillPath();
-
-    // Snout
-    g.fillStyle(pinkShadow, 1);
-    g.fillRect(19, 23, 10, 7);
-    g.fillStyle(pinkHighlight, 1);
-    g.fillRect(20, 24, 8, 5);
-    // Nostrils
-    g.fillStyle(0x8a2846, 1);
-    g.fillRect(22, 26, 2, 2);
-    g.fillRect(25, 26, 2, 2);
-
-    // Determined Angry/Brave Eyes
-    g.fillStyle(0x2d3436, 1);
-    g.fillRect(16, 19, 4, 3);
-    g.fillRect(28, 19, 4, 3);
-    // White eye shine
-    g.fillStyle(0xffffff, 1);
-    g.fillRect(17, 19, 1.5, 1.5);
-    g.fillRect(29, 19, 1.5, 1.5);
-
-    // Trotters / Legs
-    g.fillStyle(pinkShadow, 1);
-    g.fillRect(15, 34, 5, 8);
-    g.fillRect(24, 34, 5, 8);
-
-    g.generateTexture('piggy', w, h);
+    if (window.CosmeticsManager) {
+      window.CosmeticsManager.generatePiggyTexture(this, 'piggy');
+    }
   }
 
   createFarmerTexture() {

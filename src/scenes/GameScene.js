@@ -63,6 +63,14 @@ class GameScene extends Phaser.Scene {
     this.cloneGrid = null;
     this.cloneSprite = null;
 
+    // Load active RPG cosmetic bonuses
+    this.cosmeticBonuses = window.CosmeticsManager ? window.CosmeticsManager.getActiveBonuses() : {
+      speedMult: 1, jumpPowerMult: 1, dashCooldownMult: 1, artifactDurationMult: 1, scoreMult: 1, springBoostMult: 1, stealth: 0, mudImmune: false, hazardImmune: false
+    };
+
+    // Developer mode (testing all cosmetics & artifacts)
+    this.isDevMode = (data && data.devMode) || (window.isDevMode && this.levelIndex === 0) || false;
+
     // Touch controls input state & Analog Touch Joystick
     this.touchInput = { up: false, down: false, left: false, right: false };
     this.touchJoystick = { x: 0, y: 0, active: false };
@@ -71,6 +79,14 @@ class GameScene extends Phaser.Scene {
   create() {
     const w = this.cameras.main.width;
     const h = this.cameras.main.height;
+
+    // Developer mode pre-unlock and inventory stocking on Training level
+    if (this.isDevMode && this.levelIndex === 0) {
+      if (window.CosmeticsManager) {
+        window.CosmeticsManager.unlockAll();
+        this.inventory = window.CosmeticsManager.getAllArtifacts();
+      }
+    }
 
     // Background parallax hills and sky
     this.createBackground();
@@ -86,6 +102,7 @@ class GameScene extends Phaser.Scene {
 
     // Create Characters
     this.createCharacters();
+    this.applyCosmetics();
 
     // Particle emitter for running and dashing
     this.createParticleSystems();
@@ -107,6 +124,7 @@ class GameScene extends Phaser.Scene {
       z: Phaser.Input.Keyboard.KeyCodes.Z,
       r: Phaser.Input.Keyboard.KeyCodes.R,
       q: Phaser.Input.Keyboard.KeyCodes.Q,
+      zero: Phaser.Input.Keyboard.KeyCodes.ZERO,
       one: Phaser.Input.Keyboard.KeyCodes.ONE,
       two: Phaser.Input.Keyboard.KeyCodes.TWO,
       three: Phaser.Input.Keyboard.KeyCodes.THREE,
@@ -117,14 +135,16 @@ class GameScene extends Phaser.Scene {
     // Listen to UI Scene Commands
     this.events.on('useArtifact', (idx) => this.activateArtifact(idx));
     this.events.on('throwDirt', () => this.dropMudPatch());
+    this.events.on('refillArtifacts', () => this.refillDevArtifacts());
+    this.events.on('cosmeticsChanged', () => this.applyCosmetics());
     this.events.on('inventoryToggled', (isOpen) => {
       this.isInventoryOpen = isOpen;
       this.time.timeScale = isOpen ? 0.2 : 1.0;
       this.tweens.timeScale = isOpen ? 0.2 : 1.0;
     });
 
-    // Launch UI Scene with level & difficulty
-    this.scene.launch('UIScene', { levelIndex: this.levelIndex, difficulty: this.difficulty });
+    // Launch UI Scene with level & difficulty and devMode flag
+    this.scene.launch('UIScene', { levelIndex: this.levelIndex, difficulty: this.difficulty, devMode: this.isDevMode });
 
     // Initial event dispatch
     this.events.emit('updateScore', this.score);
@@ -134,9 +154,12 @@ class GameScene extends Phaser.Scene {
     this.events.emit('updateBuffs', { speed: 0, jump: 0, invis: 0, clone: 0 });
 
     // Head Start / Training Banner
-    const bannerStr = this.levelData.isTraining ? '🎓 TRAINING YARD 🎓\nPractice Movement, Jumping & Dashing!' : 'READY...';
-    const bannerSize = this.levelData.isTraining ? '26px' : '44px';
-    const bannerColor = this.levelData.isTraining ? '#2ecc71' : '#f1c40f';
+    let bannerStr = this.levelData.isTraining ? '🎓 TRAINING YARD 🎓\nPractice Movement, Jumping & Dashing!' : 'READY...';
+    if (this.isDevMode && this.levelIndex === 0) {
+      bannerStr = '🛠️ DEV TESTING YARD 🛠️\nAll Cosmetics & Artifacts Ready!\n[R] Gear/Cosmetics | [0] Restock Bag';
+    }
+    const bannerSize = (this.isDevMode && this.levelIndex === 0) ? '20px' : (this.levelData.isTraining ? '26px' : '44px');
+    const bannerColor = (this.isDevMode && this.levelIndex === 0) ? '#00d2d3' : (this.levelData.isTraining ? '#2ecc71' : '#f1c40f');
 
     this.countdownText = this.add.text(w / 2, h * 0.35, bannerStr, {
       fontFamily: 'Impact, Arial Black',
@@ -372,6 +395,31 @@ class GameScene extends Phaser.Scene {
     this.piggy.setOrigin(0.5, 0.85);
     this.piggy.setDepth(pigIso.y + 10);
 
+    // Easter egg: Tapping/clicking Piggy 5 times activates developer mode!
+    this.piggy.setInteractive({ useHandCursor: true });
+    let piggyTapCount = 0;
+    let piggyTapTimer = null;
+    this.piggy.on('pointerdown', () => {
+      piggyTapCount++;
+      clearTimeout(piggyTapTimer);
+      piggyTapTimer = setTimeout(() => { piggyTapCount = 0; }, 2500);
+
+      this.tweens.add({
+        targets: this.piggy,
+        scaleY: 0.8,
+        scaleX: 1.15,
+        duration: 90,
+        yoyo: true,
+        ease: 'Quad.easeOut'
+      });
+      window.sounds?.playOink();
+
+      if (piggyTapCount >= 5) {
+        piggyTapCount = 0;
+        window.activateDevMode();
+      }
+    });
+
     this.piggyBaseSpeed = 3.6; // grid units per second
     this.piggySpeed = this.piggyBaseSpeed;
     this.piggyFacing = 1; // 1 = right, -1 = left
@@ -450,10 +498,49 @@ class GameScene extends Phaser.Scene {
     });
   }
 
+  applyCosmetics() {
+    if (window.CosmeticsManager) {
+      window.CosmeticsManager.generatePiggyTexture(this, 'piggy');
+      this.cosmeticBonuses = window.CosmeticsManager.getActiveBonuses();
+      if (this.piggy) {
+        this.piggy.setTexture('piggy');
+      }
+    }
+  }
+
+  // Developer cheat option: Enables dev mode (unlocks all cosmetics & stocks all artifacts)
+  enableDevMode() {
+    this.isDevMode = true;
+    if (window.CosmeticsManager) {
+      window.CosmeticsManager.unlockAll();
+      this.inventory = window.CosmeticsManager.getAllArtifacts();
+      this.applyCosmetics();
+    }
+    this.events.emit('updateInventory', this.inventory);
+    this.events.emit('devModeActivated');
+    this.showFloatingText(this.piggy.x, this.piggy.y - 45, '🛠️ DEV MODE ACTIVATED! 🛠️', '#00d2d3');
+    window.sounds?.playWin();
+  }
+
+  enableDevModeOnTraining() {
+    this.enableDevMode();
+  }
+
+  // Developer cheat option: Instantly restocks all 5 artifacts into the inventory
+  refillDevArtifacts() {
+    if (window.CosmeticsManager) {
+      this.inventory = window.CosmeticsManager.getAllArtifacts();
+      this.events.emit('updateInventory', this.inventory);
+      this.showFloatingText(this.piggy.x, this.piggy.y - 35, '🎒 ALL 5 ARTIFACTS RESTOCKED!', '#2ecc71');
+      window.sounds?.playPowerup();
+    }
+  }
+
   requestJump() {
     if (this.isJumping || this.isGameOver || this.isVictory) return;
     this.isJumping = true;
-    this.piggyVZ = this.buffJump > 0 ? 10.4 : 6.2;
+    const jMult = this.cosmeticBonuses?.jumpPowerMult || 1.0;
+    this.piggyVZ = (this.buffJump > 0 ? 10.4 : 6.2) * jMult;
     window.sounds?.playJump();
     this.spawnDust(this.piggy.x, this.piggy.y, this.buffJump > 0 ? 8 : 4);
   }
@@ -462,7 +549,8 @@ class GameScene extends Phaser.Scene {
     if (this.dashCooldown > 0 || this.isGameOver || this.isVictory) return;
     this.isDashing = true;
     this.dashDuration = 0.42; // Dash duration in seconds
-    this.dashCooldown = 2.2;  // Cooldown in seconds
+    const cdMult = this.cosmeticBonuses?.dashCooldownMult || 1.0;
+    this.dashCooldown = 2.2 * cdMult;  // Cooldown scaled by Superhero Cape etc.
     window.sounds?.playDash();
     this.spawnDust(this.piggy.x, this.piggy.y, 8);
     this.events.emit('updateDash', false);
@@ -634,6 +722,11 @@ class GameScene extends Phaser.Scene {
     if (Phaser.Input.Keyboard.JustDown(k.four)) this.activateArtifact(3);
     if (Phaser.Input.Keyboard.JustDown(k.five)) this.activateArtifact(4);
 
+    // Developer hotkey '0' to instantly restock all 5 artifacts
+    if (this.isDevMode && Phaser.Input.Keyboard.JustDown(k.zero)) {
+      this.refillDevArtifacts();
+    }
+
     // Calculate movement vector
     if (dx !== 0 || dy !== 0) {
       // Normalize diagonal speed
@@ -642,13 +735,16 @@ class GameScene extends Phaser.Scene {
       dy /= len;
 
       // Base speed calculation
-      let currentSpeed = this.piggyBaseSpeed;
+      const speedMult = this.cosmeticBonuses?.speedMult || 1.0;
+      let currentSpeed = this.piggyBaseSpeed * speedMult;
       if (this.isDashing) currentSpeed *= 1.85;
       if (this.buffSpeed > 0) currentSpeed *= 1.95; // Golden Pepper Speed Boost!
 
-      // Apply Mud Slowdown (if not jumping)
+      // Apply Mud Slowdown (if not jumping and not wearing Mud Camo Overalls)
       if (!this.isJumping && this.isPiggyOnMud()) {
-        currentSpeed *= 0.42;
+        if (!this.cosmeticBonuses?.mudImmune) {
+          currentSpeed *= 0.42;
+        }
       }
 
       // Option 1: True Screen-Relative Isometric Movement
@@ -937,11 +1033,14 @@ class GameScene extends Phaser.Scene {
             item.collected = true;
             window.sounds?.playCollect();
 
-            // Points based on apple type
+            // Points based on apple type (scaled by Golden Crown bonus)
             let pts = 50;
             if (item.type === 'apple_gold') pts = 150;
             else if (item.type === 'apple_green') pts = 75;
             else if (item.type === 'acorn') pts = 25;
+
+            const scoreMult = this.cosmeticBonuses?.scoreMult || 1.0;
+            pts = Math.round(pts * scoreMult);
 
             this.score += pts;
             this.events.emit('updateScore', this.score);
@@ -965,10 +1064,11 @@ class GameScene extends Phaser.Scene {
       const d = Math.hypot(this.piggyGrid.x - obs.gridX, this.piggyGrid.y - obs.gridY);
       if (d < 0.7) {
         if (obs.type === 'hay_spring' && !this.isJumping) {
-          // Launch Piggy high!
+          // Launch Piggy high! (boosted by Spring Cleats)
           window.sounds?.playBounce();
           this.isJumping = true;
-          this.piggyVZ = 8.5; // mega jump
+          const sMult = this.cosmeticBonuses?.springBoostMult || 1.0;
+          this.piggyVZ = 8.5 * sMult; // mega jump
           this.spawnDust(this.piggy.x, this.piggy.y, 8);
           // Spring squash and stretch tween
           this.tweens.add({
@@ -979,14 +1079,18 @@ class GameScene extends Phaser.Scene {
             ease: 'Quad.easeOut'
           });
         } else if (obs.type === 'spikes' && !this.isJumping) {
-          // Spikes trip Piggy!
-          window.sounds?.playHurt();
-          this.piggyGrid.y -= 0.35; // knock back
-          this.cameras.main.shake(180, 0.015);
+          // Spikes trip Piggy! (deflected if wearing Knight Plate Armor)
+          if (!this.cosmeticBonuses?.hazardImmune) {
+            window.sounds?.playHurt();
+            this.piggyGrid.y -= 0.35; // knock back
+            this.cameras.main.shake(180, 0.015);
+          }
         } else if (obs.type === 'thorn' && !this.isJumping) {
           // Thorn bush scratches Piggy
-          window.sounds?.playHurt();
-          this.piggyGrid.x += (this.piggyGrid.x > obs.gridX ? 0.3 : -0.3);
+          if (!this.cosmeticBonuses?.hazardImmune) {
+            window.sounds?.playHurt();
+            this.piggyGrid.x += (this.piggyGrid.x > obs.gridX ? 0.3 : -0.3);
+          }
         }
       }
     }
@@ -1020,6 +1124,9 @@ class GameScene extends Phaser.Scene {
     if (this.isVictory || this.isGameOver) return;
     this.isVictory = true;
 
+    // Unlock any cosmetic rewards for completing this level
+    const newUnlocks = window.CosmeticsManager ? window.CosmeticsManager.unlockLevelRewards(this.levelIndex) : [];
+
     // Victory celebration hop into the barn
     this.tweens.add({
       targets: this.piggy,
@@ -1033,7 +1140,8 @@ class GameScene extends Phaser.Scene {
     this.time.delayedCall(600, () => {
       this.events.emit('levelWon', {
         levelIndex: this.levelIndex,
-        timeLeft: this.timeLeft
+        timeLeft: this.timeLeft,
+        newUnlocks: newUnlocks
       });
     });
   }
@@ -1046,14 +1154,17 @@ class GameScene extends Phaser.Scene {
 
     window.sounds?.playPowerup();
 
+    // Duration scaled by Wizard Hat etc.
+    const durMult = this.cosmeticBonuses?.artifactDurationMult || 1.0;
+
     if (art.id === 'speed') {
-      this.buffSpeed = 6.0;
+      this.buffSpeed = 6.0 * durMult;
       this.showFloatingText(this.piggy.x, this.piggy.y - 35, '⚡ SPEED BOOST! ⚡', '#f39c12');
     } else if (art.id === 'jump') {
-      this.buffJump = 7.0;
+      this.buffJump = 7.0 * durMult;
       this.showFloatingText(this.piggy.x, this.piggy.y - 35, '🪽 SUPER JUMP READY! 🪽', '#00d2d3');
     } else if (art.id === 'invis') {
-      this.buffInvis = 5.0;
+      this.buffInvis = 5.0 * durMult;
       this.piggy.setAlpha(0.35);
       window.sounds?.playInvis();
       this.showFloatingText(this.piggy.x, this.piggy.y - 35, '👻 INVISIBLE! 👻', '#a29bfe');

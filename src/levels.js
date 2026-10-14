@@ -48,8 +48,6 @@ window.GAME_LEVELS = [
       { type: 'tree_green', x: 1, y: 3 },
       { type: 'tree_green', x: 10, y: 4 },
       { type: 'tree_autumn', x: 1, y: 10 },
-      { type: 'pumpkin', x: 2, y: 12 },
-      { type: 'pumpkin', x: 9, y: 12 },
       { type: 'barn', x: 5, y: 21 },
     ]
   },
@@ -94,7 +92,6 @@ window.GAME_LEVELS = [
       { type: 'fence', x: 3, y: 6 },
       { type: 'fence', x: 8, y: 8 },
       { type: 'fence', x: 9, y: 8 },
-      { type: 'pumpkin', x: 2, y: 11 },
       { type: 'tree_autumn', x: 10, y: 13 },
       { type: 'tree_green', x: 1, y: 16 },
       { type: 'barn', x: 5, y: 23 },
@@ -188,8 +185,6 @@ window.GAME_LEVELS = [
     scenery: [
       { type: 'tree_autumn', x: 1, y: 3 },
       { type: 'tree_autumn', x: 12, y: 4 },
-      { type: 'pumpkin', x: 2, y: 9 },
-      { type: 'pumpkin', x: 11, y: 12 },
       { type: 'tree_autumn', x: 1, y: 17 },
       { type: 'tree_autumn', x: 12, y: 18 },
       { type: 'fence', x: 3, y: 21 },

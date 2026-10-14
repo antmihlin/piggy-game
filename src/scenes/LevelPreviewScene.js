@@ -110,6 +110,9 @@ class LevelPreviewScene extends Phaser.Scene {
     });
 
     // 5. Hero & Farmer Spawn Markers
+    if (window.CosmeticsManager) {
+      window.CosmeticsManager.generatePiggyTexture(this, 'piggy');
+    }
     const pStart = lvl.piggyStart || { x: 5, y: 3, z: 0 };
     const pIso = this.gridToIso(pStart.x, pStart.y, pStart.z);
     const pig = this.add.image(pIso.x, pIso.y, 'piggy');

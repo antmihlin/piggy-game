@@ -90,6 +90,31 @@ class MenuScene extends Phaser.Scene {
       ease: 'Sine.easeInOut'
     });
 
+    // Tap/Click Title 5 times to activate Developer Mode & launch Training Yard!
+    titleContainer.setSize(380, 70);
+    titleContainer.setInteractive({ useHandCursor: true });
+    let menuTapCount = 0;
+    let menuTapTimer = null;
+    titleContainer.on('pointerdown', () => {
+      menuTapCount++;
+      clearTimeout(menuTapTimer);
+      menuTapTimer = setTimeout(() => { menuTapCount = 0; }, 2500);
+
+      this.tweens.add({
+        targets: titleContainer,
+        scaleX: 1.05,
+        scaleY: 0.95,
+        duration: 80,
+        yoyo: true
+      });
+      window.sounds?.playOink();
+
+      if (menuTapCount >= 5) {
+        menuTapCount = 0;
+        window.activateDevMode();
+      }
+    });
+
     // ==========================================
     // 1. PIXELATED LEVEL SELECTOR
     // ==========================================
