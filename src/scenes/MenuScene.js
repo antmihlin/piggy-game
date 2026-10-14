@@ -272,28 +272,6 @@ class MenuScene extends Phaser.Scene {
       }
     );
 
-    // Fullscreen Toggle Button (Top Right)
-    const fsBtn = this.add.container(width - 45, 30);
-    const fsG = this.add.graphics();
-    this.drawPixelBox(fsG, 0, 0, 36, 36, 0x2c3e50, 0x34495e, 0x111111, 0x7f8c8d, 2);
-    fsBtn.add(fsG);
-    const fsTxt = this.add.text(0, -1, '⛶', {
-      fontFamily: '"Press Start 2P", monospace',
-      fontSize: '14px',
-      color: '#ffffff'
-    }).setOrigin(0.5);
-    fsBtn.add(fsTxt);
-    fsBtn.setSize(36, 36);
-    fsBtn.setInteractive({ useHandCursor: true });
-    fsBtn.on('pointerdown', () => {
-      window.sounds?.playOink();
-      if (this.scale.isFullscreen) {
-        this.scale.stopFullscreen();
-      } else {
-        this.scale.startFullscreen();
-      }
-    });
-
     // Keyboard Space or Enter to start
     this.input.keyboard.on('keydown-SPACE', () => this.startGame());
     this.input.keyboard.on('keydown-ENTER', () => this.startGame());

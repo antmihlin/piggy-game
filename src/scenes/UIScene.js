@@ -37,17 +37,8 @@ class UIScene extends Phaser.Scene {
       this.scene.start('MenuScene', { levelIndex: this.levelIndex, difficulty: this.difficulty });
     });
 
-    // 2b. Fullscreen Toggle Button
-    this.createHudButton(114, 20, 42, 36, '⛶', 0x2f3542, () => {
-      if (this.scale.isFullscreen) {
-        this.scale.stopFullscreen();
-      } else {
-        this.scale.startFullscreen();
-      }
-    });
-
-    // 3. Score Display
-    this.scoreText = this.add.text(168, 28, '⭐ 0', {
+    // 3. Score Display (Top Left, next to Menu button)
+    this.scoreText = this.add.text(124, 28, '⭐ 0', {
       fontFamily: '"Press Start 2P", monospace',
       fontSize: '12px',
       color: '#f1c40f'
@@ -419,11 +410,11 @@ class UIScene extends Phaser.Scene {
     // ==========================================
     // 1. VIRTUAL JOYSTICK (Bottom-Left Dot Drag)
     // ==========================================
-    const joyBaseX = 100;
-    const joyBaseY = height - 90;
-    const joyMaxRadius = 45;
+    this.joyBaseX = 100;
+    this.joyBaseY = height - 90;
+    this.joyMaxRadius = 45;
 
-    this.joystickContainer = this.add.container(joyBaseX, joyBaseY).setDepth(3000);
+    this.joystickContainer = this.add.container(this.joyBaseX, this.joyBaseY).setDepth(3000);
 
     // Outer boundary ring
     const baseG = this.add.graphics();
@@ -472,11 +463,11 @@ class UIScene extends Phaser.Scene {
     let activeTouchId = null;
 
     const updateKnobPos = (pointer) => {
-      const lx = pointer.x - joyBaseX;
-      const ly = pointer.y - joyBaseY;
+      const lx = pointer.x - this.joyBaseX;
+      const ly = pointer.y - this.joyBaseY;
       const dist = Math.hypot(lx, ly);
       const angle = Math.atan2(ly, lx);
-      const clampedDist = Math.min(dist, joyMaxRadius);
+      const clampedDist = Math.min(dist, this.joyMaxRadius);
 
       const kx = Math.cos(angle) * clampedDist;
       const ky = Math.sin(angle) * clampedDist;
@@ -484,8 +475,8 @@ class UIScene extends Phaser.Scene {
       this.joystickKnob.x = kx;
       this.joystickKnob.y = ky;
 
-      const normX = kx / joyMaxRadius;
-      const normY = ky / joyMaxRadius;
+      const normX = kx / this.joyMaxRadius;
+      const normY = ky / this.joyMaxRadius;
 
       if (this.gameScene) {
         this.gameScene.touchJoystick = { x: normX, y: normY, active: true };
@@ -614,6 +605,11 @@ class UIScene extends Phaser.Scene {
     if (this.dashBtn) {
       this.dashBtn.x = w - 175;
       this.dashBtn.y = h - 75;
+    }
+    if (this.joystickContainer) {
+      this.joyBaseX = 100;
+      this.joyBaseY = h - 90;
+      this.joystickContainer.setPosition(this.joyBaseX, this.joyBaseY);
     }
   }
 

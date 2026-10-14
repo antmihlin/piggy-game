@@ -1,23 +1,28 @@
 // Main entry point for Piggy Escape: Farmer Chase
 
-// Dynamically calculate game width to perfectly match mobile landscape screen aspect ratio
-// (e.g. 19.5:9 on iPhone, 20:9 on Android, 16:9 on PC) so there are ZERO black bars on the sides!
+// Accurately obtain viewport dimensions across desktop, mobile Safari, and Android Chrome
+function getViewportDimensions() {
+  let w = window.innerWidth;
+  let h = window.innerHeight;
+  if (window.visualViewport) {
+    w = window.visualViewport.width;
+    h = window.visualViewport.height;
+  }
+  if (!w || !h) {
+    w = document.documentElement.clientWidth || 960;
+    h = document.documentElement.clientHeight || 540;
+  }
+  return { w: Math.round(w), h: Math.round(h) };
+}
+
+// Dynamically calculate game width to match the screen's exact aspect ratio
+// (e.g. 19.5:9 on iPhone, 20:9 on Android, 16:9 on PC, 21:9 ultrawide) so there are ZERO black bars!
 function calculateResponsiveGameSize() {
-  const windowW = window.innerWidth || document.documentElement.clientWidth || 960;
-  const windowH = window.innerHeight || document.documentElement.clientHeight || 540;
-  const aspect = windowW / windowH;
+  const { w, h } = getViewportDimensions();
+  const aspect = w / h;
 
   const baseH = 540;
-  // If landscape or wide (aspect >= 1.6), expand base width so game matches screen aspect ratio edge-to-edge
-  let baseW;
-  if (aspect >= 1.6) {
-    baseW = Math.max(960, Math.min(1366, Math.round(baseH * aspect)));
-  } else if (aspect >= 1.0) {
-    baseW = 960;
-  } else {
-    // If portrait on phone, give sufficient width so game is playable in portrait
-    baseW = 960;
-  }
+  const baseW = Math.max(360, Math.round(baseH * aspect));
 
   return { width: baseW, height: baseH };
 }
@@ -31,7 +36,7 @@ window.addEventListener('load', () => {
     scale: {
       mode: Phaser.Scale.FIT,
       parent: 'game-container',
-      autoCenter: Phaser.Scale.CENTER_BOTH,
+      autoCenter: Phaser.Scale.NO_CENTER,
       width: initialSize.width,
       height: initialSize.height
     },
@@ -62,10 +67,22 @@ window.addEventListener('load', () => {
     window.game.scale.refresh();
   };
 
-  // Re-calculate on resize and mobile orientation change
+  // Re-calculate immediately on window resize, visual viewport resize, and orientation change
   window.addEventListener('resize', handleResize);
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', handleResize);
+  }
   window.addEventListener('orientationchange', () => {
-    setTimeout(handleResize, 100);
+    setTimeout(handleResize, 50);
+    setTimeout(handleResize, 150);
     setTimeout(handleResize, 300);
+    setTimeout(handleResize, 600);
   });
+  if (window.screen && window.screen.orientation) {
+    window.screen.orientation.addEventListener('change', () => {
+      setTimeout(handleResize, 50);
+      setTimeout(handleResize, 200);
+      setTimeout(handleResize, 500);
+    });
+  }
 });

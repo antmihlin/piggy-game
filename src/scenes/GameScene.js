@@ -436,6 +436,18 @@ class GameScene extends Phaser.Scene {
     // On mobile / tablet, zoom in more (1.45) so Piggy, hazards, and items are clearly visible
     const defaultZoom = isMobileOrTablet ? 1.45 : 1.15;
     cam.setZoom(defaultZoom);
+
+    const resizeHandler = (gameSize) => {
+      const isMob = ('ontouchstart' in window) || 
+        (navigator.maxTouchPoints > 0) || 
+        (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) ||
+        (gameSize.width <= 850);
+      cam.setZoom(isMob ? 1.45 : 1.15);
+    };
+    this.scale.on('resize', resizeHandler);
+    this.events.once('shutdown', () => {
+      this.scale.off('resize', resizeHandler);
+    });
   }
 
   requestJump() {
