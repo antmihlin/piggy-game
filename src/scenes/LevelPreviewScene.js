@@ -66,46 +66,83 @@ class LevelPreviewScene extends Phaser.Scene {
     const gw = lvl.gridWidth;
     const gh = lvl.gridHeight;
     const pathX = lvl.pathX || Math.floor(gw / 2);
+    const tileGrid = window.buildLevelTileGrid ? window.buildLevelTileGrid(lvl) : [];
 
-    // 1. Render Foundation Tiles
+    // 1. Render Foundation Tiles (including water, jumping platforms, multi-height cubes & floating islands)
     for (let y = 0; y < gh; y++) {
       for (let x = 0; x < gw; x++) {
-        const isPath = Math.abs(x - pathX) <= 1;
-        const tileKey = isPath ? 'tile_dirt' : 'tile_grass';
-        const z = (x === 0 || x === gw - 1) ? 1 : 0;
+        const cell = (tileGrid[y] && tileGrid[y][x]) || {
+          x, y,
+          tileKey: Math.abs(x - pathX) <= 1 ? 'tile_dirt' : 'tile_grass',
+          z: (x === 0 || x === gw - 1) ? 1 : 0,
+          isWater: false, isPlatform: false, isFloatingIsland: false, isVoid: false
+        };
 
-        const iso = this.gridToIso(x, y, z);
-        const tile = this.add.image(iso.x, iso.y, tileKey);
-        tile.setOrigin(0.5, 0.35);
-        tile.setDepth(iso.y - 100);
-        this.mapContainer.add(tile);
+        if (cell.isVoid) continue;
+
+        const baseIsoY = (x + y) * (this.tileHeight / 2);
+
+        if (cell.hasWaterUnderneath) {
+          const waterIso = this.gridToIso(x, y, -0.35);
+          const waterTile = this.add.image(waterIso.x, waterIso.y, 'tile_water');
+          waterTile.setOrigin(0.5, 0.35);
+          waterTile.setDepth(baseIsoY - 120);
+          this.mapContainer.add(waterTile);
+        }
+
+        if (!cell.isPlatform && !cell.isFloatingIsland && !cell.isWater && cell.z > 0) {
+          const stackKey = cell.stackBaseKey || 'tile_dirt';
+          for (let sz = 0; sz < cell.z; sz++) {
+            const sIso = this.gridToIso(x, y, sz);
+            const sTile = this.add.image(sIso.x, sIso.y, stackKey);
+            sTile.setOrigin(0.5, 0.35);
+            sTile.setDepth(baseIsoY - 105 + sz * 2);
+            this.mapContainer.add(sTile);
+          }
+        }
+
+        if (cell.tileKey) {
+          const iso = this.gridToIso(x, y, cell.z);
+          const tile = this.add.image(iso.x, iso.y, cell.tileKey);
+          tile.setOrigin(0.5, 0.35);
+          const depthOffset = cell.isWater ? -115 : (-95 + cell.z * 2);
+          tile.setDepth(baseIsoY + depthOffset);
+          this.mapContainer.add(tile);
+        }
       }
     }
 
-    // 2. Obstacles
-    (lvl.obstacles || []).forEach(obs => {
-      const iso = this.gridToIso(obs.x, obs.y, obs.z || 0);
+    // 2. Obstacles (including procedural Cactus Labyrinth walls)
+    const obsList = window.getLevelObstacles ? window.getLevelObstacles(lvl) : (lvl.obstacles || []);
+    obsList.forEach(obs => {
+      const oz = obs.z || 0;
+      const iso = this.gridToIso(obs.x, obs.y, oz);
+      const baseIsoY = (obs.x + obs.y) * (this.tileHeight / 2);
       const sprite = this.add.image(iso.x, iso.y, obs.type);
-      sprite.setOrigin(0.5, 0.7);
-      sprite.setDepth(iso.y);
+      sprite.setOrigin(0.5, obs.type === 'cactus' ? 0.85 : 0.7);
+      sprite.setDepth(baseIsoY + oz * 2);
       this.mapContainer.add(sprite);
     });
 
     // 3. Collectibles
     (lvl.items || []).forEach(item => {
-      const iso = this.gridToIso(item.x, item.y, item.z || 0);
+      const iz = item.z || 0;
+      const iso = this.gridToIso(item.x, item.y, iz);
+      const baseIsoY = (item.x + item.y) * (this.tileHeight / 2);
       const sprite = this.add.image(iso.x, iso.y - 8, item.type);
       sprite.setOrigin(0.5, 0.7);
-      sprite.setDepth(iso.y + 5);
+      sprite.setDepth(baseIsoY + 6 + iz * 2);
       this.mapContainer.add(sprite);
     });
 
     // 4. Scenery (Barn, Trees, Fences)
     (lvl.scenery || []).forEach(sc => {
-      const iso = this.gridToIso(sc.x, sc.y, sc.z || 0);
+      const sz = sc.z || 0;
+      const iso = this.gridToIso(sc.x, sc.y, sz);
+      const baseIsoY = (sc.x + sc.y) * (this.tileHeight / 2);
       const sprite = this.add.image(iso.x, iso.y, sc.type);
       sprite.setOrigin(0.5, 0.85);
-      sprite.setDepth(iso.y + (sc.type === 'barn' ? 40 : 0));
+      sprite.setDepth(baseIsoY + (sc.type === 'barn' ? 40 : 0) + sz * 2);
       this.mapContainer.add(sprite);
     });
 
@@ -114,10 +151,11 @@ class LevelPreviewScene extends Phaser.Scene {
       window.CosmeticsManager.generatePiggyTexture(this, 'piggy');
     }
     const pStart = lvl.piggyStart || { x: 5, y: 3, z: 0 };
-    const pIso = this.gridToIso(pStart.x, pStart.y, pStart.z);
+    const pIso = this.gridToIso(pStart.x, pStart.y, pStart.z || 0);
+    const pBaseIsoY = (pStart.x + pStart.y) * (this.tileHeight / 2);
     const pig = this.add.image(pIso.x, pIso.y, 'piggy');
     pig.setOrigin(0.5, 0.85);
-    pig.setDepth(pIso.y + 15);
+    pig.setDepth(pBaseIsoY + 15 + (pStart.z || 0) * 2);
     this.mapContainer.add(pig);
 
     // Floating Pin for Piggy
@@ -125,10 +163,11 @@ class LevelPreviewScene extends Phaser.Scene {
     this.mapContainer.add(pBadge);
 
     const fStart = lvl.farmerStart || { x: 5, y: -2, z: 0 };
-    const fIso = this.gridToIso(fStart.x, fStart.y, fStart.z);
+    const fIso = this.gridToIso(fStart.x, fStart.y, fStart.z || 0);
+    const fBaseIsoY = (fStart.x + fStart.y) * (this.tileHeight / 2);
     const farmer = this.add.image(fIso.x, fIso.y, 'farmer');
     farmer.setOrigin(0.5, 0.85);
-    farmer.setDepth(fIso.y + 15);
+    farmer.setDepth(fBaseIsoY + 15 + (fStart.z || 0) * 2);
     this.mapContainer.add(farmer);
 
     // Floating Pin for Farmer
@@ -136,8 +175,8 @@ class LevelPreviewScene extends Phaser.Scene {
     this.mapContainer.add(fBadge);
 
     // Goal Marker (The Barn)
-    const goal = lvl.goal || { x: pathX, y: gh - 2 };
-    const gIso = this.gridToIso(goal.x, goal.y, 0);
+    const goal = lvl.goal || { x: pathX, y: gh - 2, z: 0 };
+    const gIso = this.gridToIso(goal.x, goal.y, goal.z || 0);
     const gBadge = this.createPinBadge(gIso.x, gIso.y - 85, '🏡 GOAL (BARN)', 0xf1c40f, 0x000000);
     this.mapContainer.add(gBadge);
 
@@ -146,7 +185,7 @@ class LevelPreviewScene extends Phaser.Scene {
     this.cameras.main.centerOn(midIso.x, midIso.y);
 
     // Update stats card text
-    if (this.statsText) {
+    if (this.statsTitle) {
       this.updateStatsCard(lvl);
     }
   }
@@ -240,14 +279,16 @@ class LevelPreviewScene extends Phaser.Scene {
       color: '#a4b0be'
     }).setScrollFactor(0);
 
-    // Level Selector Tabs in Top Bar
+    // Level Selector Tabs in Top Bar (dynamically sized for 7+ levels)
     this.tabButtons = [];
-    const tabSpacing = 92;
+    const availW = Math.max(320, width - 270);
+    const tabSpacing = Math.min(72, Math.floor(availW / Math.max(1, this.levels.length)));
+    this.tabBtnWidth = Math.max(48, tabSpacing - 6);
     const totalTabsW = this.levels.length * tabSpacing;
-    const tabStartX = width - totalTabsW - 10;
+    const tabStartX = width - totalTabsW - 8;
     this.levels.forEach((lvl, idx) => {
-      const label = lvl.isTraining ? '🎓 YARD' : `LVL ${lvl.id}`;
-      const tab = this.createTabButton(tabStartX + idx * tabSpacing + 42, 35, label, idx === this.currentLevelIndex, () => {
+      const label = lvl.isTraining ? '🎓 0' : `LVL ${lvl.id}`;
+      const tab = this.createTabButton(tabStartX + idx * tabSpacing + tabSpacing / 2, 35, label, idx === this.currentLevelIndex, () => {
         window.sounds?.playOink();
         this.selectLevel(idx);
       });
@@ -368,45 +409,48 @@ class LevelPreviewScene extends Phaser.Scene {
     const btn = this.add.container(x, y).setScrollFactor(0);
     const bg = this.add.graphics();
     btn.bg = bg;
+    const bw = this.tabBtnWidth || 66;
 
-    this.styleTabBg(bg, isActive);
+    this.styleTabBg(bg, isActive, bw);
 
     const text = this.add.text(0, 0, label, {
       fontFamily: 'Arial Black',
-      fontSize: '13px',
+      fontSize: bw < 60 ? '10px' : '12px',
       color: isActive ? '#ffffff' : '#bdc3c7'
     }).setOrigin(0.5);
     btn.text = text;
     btn.add(bg);
     btn.add(text);
 
-    btn.setSize(100, 36);
+    btn.setSize(bw, 34);
     btn.setInteractive({ useHandCursor: true });
     btn.on('pointerdown', onClick);
 
     return btn;
   }
 
-  styleTabBg(bg, isActive) {
+  styleTabBg(bg, isActive, bw = 66) {
+    const hw = bw / 2;
     bg.clear();
     if (isActive) {
       bg.fillStyle(0xff9f43, 1);
-      bg.fillRoundedRect(-50, -18, 100, 36, 10);
+      bg.fillRoundedRect(-hw, -17, bw, 34, 8);
       bg.lineStyle(2, 0xffffff, 0.9);
-      bg.strokeRoundedRect(-50, -18, 100, 36, 10);
+      bg.strokeRoundedRect(-hw, -17, bw, 34, 8);
     } else {
       bg.fillStyle(0x2c3e50, 0.8);
-      bg.fillRoundedRect(-50, -18, 100, 36, 10);
+      bg.fillRoundedRect(-hw, -17, bw, 34, 8);
       bg.lineStyle(1, 0xffffff, 0.3);
-      bg.strokeRoundedRect(-50, -18, 100, 36, 10);
+      bg.strokeRoundedRect(-hw, -17, bw, 34, 8);
     }
   }
 
   selectLevel(index) {
     this.currentLevelIndex = index;
+    const bw = this.tabBtnWidth || 66;
     this.tabButtons.forEach((tab, i) => {
       const active = i === index;
-      this.styleTabBg(tab.bg, active);
+      this.styleTabBg(tab.bg, active, bw);
       tab.text.setColor(active ? '#ffffff' : '#bdc3c7');
     });
     this.renderLevelMap(index);
@@ -419,9 +463,10 @@ class LevelPreviewScene extends Phaser.Scene {
     this.statsSubtitle.setText(lvl.subtitle);
 
     const itemCount = lvl.items ? lvl.items.length : 0;
-    const obsCount = lvl.obstacles ? lvl.obstacles.length : 0;
+    const obsList = window.getLevelObstacles ? window.getLevelObstacles(lvl) : (lvl.obstacles || []);
+    const obsCount = obsList.length;
     const farmerDesc = lvl.isTraining ? 'ASLEEP 💤' : `${lvl.farmerSpeed}`;
-    this.statsDetails.setText(`🍎 Items: ${itemCount} | ⚠️ Traps: ${obsCount} | ⏱️ ${lvl.timeLimit}s | 🌾 Farmer: ${farmerDesc}`);
+    this.statsDetails.setText(`🍎 Items: ${itemCount} | ⚠️ Obstacles: ${obsCount} | ⏱️ ${lvl.timeLimit}s | 🌾 Farmer: ${farmerDesc}`);
   }
 }
 

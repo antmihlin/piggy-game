@@ -56,6 +56,15 @@ class BootScene extends Phaser.Scene {
     // 3. Isometric Block: Stone Block
     this.createIsometricCube('tile_stone', '#8d99ae', '#6c7a89', '#556270', '#3b444e');
 
+    // 3b. Isometric Block: Desert Sand & Canyon Path
+    this.createIsometricCube('tile_sand', '#f6d776', '#e2be52', '#c89d38', '#9e7822');
+    this.createIsometricCube('tile_sand_path', '#df9a57', '#c77f3c', '#9c5f27', '#754418');
+
+    // 3c. Isometric Block: Water Tile, Jumping Platform & Floating Island Cube
+    this.createWaterTileTexture();
+    this.createJumpingPlatformTexture();
+    this.createFloatingIslandTexture();
+
     // 4. Piggy Texture (Voxel Pig with Red Headband)
     this.createPiggyTexture();
 
@@ -66,6 +75,7 @@ class BootScene extends Phaser.Scene {
     this.createSpikesTexture();
     this.createMudTexture();
     this.createThornTexture();
+    this.createCactusTexture();
     this.createHaySpringTexture();
     this.createTreeTexture('tree_green', '#48b83e', '#358a2d');
     this.createTreeTexture('tree_autumn', '#e67e22', '#d35400');
@@ -152,6 +162,220 @@ class BootScene extends Phaser.Scene {
     g.strokePath();
 
     g.generateTexture(key, w, h);
+  }
+
+  createWaterTileTexture() {
+    const w = 64;
+    const h = 54;
+    const g = this.make.graphics({ x: 0, y: 0, add: false });
+    const cx = w / 2;
+    const topY = 8;
+    const midY = 26;
+    const botY = 50;
+
+    // Top Isometric Water Surface
+    g.fillStyle(0x1da1f2, 0.92);
+    g.beginPath();
+    g.moveTo(cx, topY);
+    g.lineTo(w - 2, midY - 9);
+    g.lineTo(cx, midY);
+    g.lineTo(2, midY - 9);
+    g.closePath();
+    g.fillPath();
+
+    // Inner lagoon turquoise shimmer
+    g.fillStyle(0x48dbfb, 0.75);
+    g.beginPath();
+    g.moveTo(cx, topY + 3);
+    g.lineTo(w - 10, midY - 9);
+    g.lineTo(cx, midY - 3);
+    g.lineTo(10, midY - 9);
+    g.closePath();
+    g.fillPath();
+
+    // White foam wave ripples
+    g.fillStyle(0xffffff, 0.75);
+    g.fillRect(cx - 12, midY - 12, 10, 2);
+    g.fillRect(cx + 2, midY - 8, 8, 2);
+    g.fillRect(cx - 5, midY - 16, 12, 2);
+
+    // Left water depth face
+    g.fillStyle(0x0984e3, 0.9);
+    g.beginPath();
+    g.moveTo(2, midY - 9);
+    g.lineTo(cx, midY);
+    g.lineTo(cx, botY);
+    g.lineTo(2, botY - 9);
+    g.closePath();
+    g.fillPath();
+
+    // Right water depth face
+    g.fillStyle(0x0652dd, 0.92);
+    g.beginPath();
+    g.moveTo(cx, midY);
+    g.lineTo(w - 2, midY - 9);
+    g.lineTo(w - 2, botY - 9);
+    g.lineTo(cx, botY);
+    g.closePath();
+    g.fillPath();
+
+    // Surface highlight rim
+    g.lineStyle(1, 0xa3e4d7, 0.55);
+    g.beginPath();
+    g.moveTo(cx, topY);
+    g.lineTo(w - 2, midY - 9);
+    g.lineTo(cx, midY);
+    g.lineTo(2, midY - 9);
+    g.closePath();
+    g.strokePath();
+
+    g.generateTexture('tile_water', w, h);
+  }
+
+  createJumpingPlatformTexture() {
+    const w = 64;
+    const h = 54;
+    const g = this.make.graphics({ x: 0, y: 0, add: false });
+    const cx = w / 2;
+    const topY = 4;
+    const midY = 22;
+    const deckBotY = 34;
+
+    // Subtle drop shadow / glow below platform
+    g.fillStyle(0x000000, 0.28);
+    g.fillEllipse(cx, 46, 44, 14);
+
+    // Wooden / Steel Support Pillars underneath
+    g.fillStyle(0x576574, 1);
+    g.fillRect(14, 24, 6, 20);
+    g.fillRect(w - 20, 24, 6, 20);
+    g.fillRect(cx - 3, 28, 6, 20);
+
+    // Spring coil bands on pillars
+    g.fillStyle(0xfeca57, 1);
+    g.fillRect(13, 30, 8, 3);
+    g.fillRect(w - 21, 30, 8, 3);
+    g.fillRect(cx - 4, 34, 8, 3);
+
+    // Top Isometric Bouncy Platform Deck (Vibrant Gold / Wood)
+    g.fillStyle(0xff9f43, 1);
+    g.beginPath();
+    g.moveTo(cx, topY);
+    g.lineTo(w - 3, midY - 9);
+    g.lineTo(cx, midY);
+    g.lineTo(3, midY - 9);
+    g.closePath();
+    g.fillPath();
+
+    // Inner emerald bounce pad inlay
+    g.fillStyle(0x1dd1a1, 1);
+    g.beginPath();
+    g.moveTo(cx, topY + 4);
+    g.lineTo(w - 14, midY - 9);
+    g.lineTo(cx, midY - 4);
+    g.lineTo(14, midY - 9);
+    g.closePath();
+    g.fillPath();
+
+    // Upward chevron / bounce emblem on center
+    g.fillStyle(0xffffff, 0.85);
+    g.fillTriangle(cx, topY + 6, cx + 6, midY - 8, cx - 6, midY - 8);
+
+    // Left Platform Rim
+    g.fillStyle(0xe67e22, 1);
+    g.beginPath();
+    g.moveTo(3, midY - 9);
+    g.lineTo(cx, midY);
+    g.lineTo(cx, deckBotY);
+    g.lineTo(3, deckBotY - 9);
+    g.closePath();
+    g.fillPath();
+
+    // Right Platform Rim
+    g.fillStyle(0xd35400, 1);
+    g.beginPath();
+    g.moveTo(cx, midY);
+    g.lineTo(w - 3, midY - 9);
+    g.lineTo(w - 3, deckBotY - 9);
+    g.lineTo(cx, deckBotY);
+    g.closePath();
+    g.fillPath();
+
+    // Crisp rim outline
+    g.lineStyle(1.5, 0xfff200, 0.75);
+    g.beginPath();
+    g.moveTo(cx, topY);
+    g.lineTo(w - 3, midY - 9);
+    g.lineTo(cx, midY);
+    g.lineTo(3, midY - 9);
+    g.closePath();
+    g.strokePath();
+
+    g.generateTexture('tile_platform', w, h);
+  }
+
+  createFloatingIslandTexture() {
+    const w = 64;
+    const h = 54;
+    const g = this.make.graphics({ x: 0, y: 0, add: false });
+    const cx = w / 2;
+    const topY = 4;
+    const midY = 22;
+    const botY = 52;
+
+    // Top Lush Sky-Grass Diamond
+    g.fillStyle(0x2ed573, 1);
+    g.beginPath();
+    g.moveTo(cx, topY);
+    g.lineTo(w - 2, midY - 9);
+    g.lineTo(cx, midY);
+    g.lineTo(2, midY - 9);
+    g.closePath();
+    g.fillPath();
+
+    // Sky-grass highlight trim
+    g.fillStyle(0x7bed9f, 0.7);
+    g.fillRect(cx - 10, midY - 14, 20, 5);
+
+    // Left Tapered Floating Rock Crag
+    g.fillStyle(0x7f8fa6, 1);
+    g.beginPath();
+    g.moveTo(2, midY - 9);
+    g.lineTo(cx, midY);
+    g.lineTo(cx, botY);
+    g.lineTo(12, botY - 14);
+    g.closePath();
+    g.fillPath();
+
+    // Right Tapered Floating Rock Crag (shaded)
+    g.fillStyle(0x57606f, 1);
+    g.beginPath();
+    g.moveTo(cx, midY);
+    g.lineTo(w - 2, midY - 9);
+    g.lineTo(w - 12, botY - 14);
+    g.lineTo(cx, botY);
+    g.closePath();
+    g.fillPath();
+
+    // Hanging turf overhang on top rim
+    g.fillStyle(0x26af61, 1);
+    g.fillRect(8, midY - 7, 18, 4);
+    g.fillRect(cx + 4, midY - 7, 18, 4);
+
+    // Glowing sky-crystal core in floating rock
+    g.fillStyle(0x48dbfb, 0.85);
+    g.fillTriangle(cx - 4, 32, cx + 4, 32, cx, 42);
+
+    g.lineStyle(1.5, 0xffffff, 0.35);
+    g.beginPath();
+    g.moveTo(cx, topY);
+    g.lineTo(w - 2, midY - 9);
+    g.lineTo(cx, midY);
+    g.lineTo(2, midY - 9);
+    g.closePath();
+    g.strokePath();
+
+    g.generateTexture('tile_island', w, h);
   }
 
   createPiggyTexture() {
@@ -403,6 +627,59 @@ class BootScene extends Phaser.Scene {
     thorns.forEach(t => g.fillTriangle(t[0], t[1], t[2], t[3], t[4], t[5]));
 
     g.generateTexture('thorn', w, h);
+  }
+
+  createCactusTexture() {
+    const w = 52;
+    const h = 68;
+    const g = this.make.graphics({ x: 0, y: 0, add: false });
+
+    // Ground shadow
+    g.fillStyle(0x000000, 0.3);
+    g.fillEllipse(w / 2, h - 5, 34, 12);
+
+    // Main central saguaro voxel trunk
+    g.fillStyle(0x2ecc71, 1);
+    g.fillRect(19, 12, 14, 52);
+    // Shaded right rib of trunk
+    g.fillStyle(0x27ae60, 1);
+    g.fillRect(26, 12, 7, 52);
+    // Dark vertical cactus groove
+    g.fillStyle(0x1e8449, 1);
+    g.fillRect(24, 14, 2, 48);
+
+    // Left Saguaro Arm
+    g.fillStyle(0x2ecc71, 1);
+    g.fillRect(7, 30, 12, 8);
+    g.fillRect(7, 18, 8, 18);
+    g.fillStyle(0x27ae60, 1);
+    g.fillRect(11, 18, 4, 18);
+
+    // Right Saguaro Arm (slightly lower)
+    g.fillStyle(0x27ae60, 1);
+    g.fillRect(33, 36, 12, 8);
+    g.fillRect(37, 22, 8, 20);
+    g.fillStyle(0x1e8449, 1);
+    g.fillRect(41, 22, 4, 20);
+
+    // Prickly Yellow/White Needles
+    g.fillStyle(0xfff200, 1);
+    const needles = [
+      [16, 18], [16, 26], [16, 44], [16, 54],
+      [33, 16], [33, 28], [33, 48], [33, 56],
+      [4, 22], [4, 30], [45, 26], [45, 36]
+    ];
+    needles.forEach(([nx, ny]) => {
+      g.fillRect(nx, ny, 3, 2);
+    });
+
+    // Vibrant Magenta Desert Flower on crown
+    g.fillStyle(0xf368e0, 1);
+    g.fillRect(22, 6, 8, 6);
+    g.fillStyle(0xfeca57, 1);
+    g.fillRect(24, 8, 4, 3);
+
+    g.generateTexture('cactus', w, h);
   }
 
   createHaySpringTexture() {

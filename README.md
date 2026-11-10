@@ -123,6 +123,20 @@ A developer shortcut is available to test all cosmetics and artifacts:
 
 ---
 
+## 🗺️ World Levels Catalog (Levels 0–6)
+
+| Level | Name | Theme | Signature Mechanics |
+| :---: | :--- | :--- | :--- |
+| **0** | **Training Yard** | `training` | Peaceful practice yard with snoozing Farmer, tutorial hints, and all obstacle/artifact types. |
+| **1** | **Sunny Pasture** | `grass` | Classic green farmyard sprint with thorn bushes, spikes, mud puddles, and hay springs. |
+| **2** | **Muddy Crossroad** | `dirt_mud` | Wider muddy farm trail with elevated side terraces and double pitchfork spike traps. |
+| **3** | **Autumn Barnyard Chase** | `autumn` | High-speed autumn run with dense obstacle clusters and spring-launched golden apples. |
+| **4** | **Splashy Lagoon** | `water_platforms` | Ground at the beginning and end only! Everything in between is water filled with bouncy **jumping platforms** at multiple heights (`z = 0, 1, 2`) and platform-top artifacts. |
+| **5** | **Cactus Labyrinth** | `desert_labyrinth` | Desert sandstone maze constructed of prickly **saguaro cactuses**, winding corridors, treasure alcoves, and wall-vaulting hay springs. |
+| **6** | **Sky Cubes & Floating Islands** | `sky_islands` | 3D terrain of **multi-height ground cubes** (`z = 0..3`) where Piggy climbs up and drops down, bridged by **Floating Islands** over open sky chasms! |
+
+---
+
 ## 🚀 Running Locally
 
 The local game server runs on Node.js:

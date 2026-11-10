@@ -39,6 +39,10 @@ class GameScene extends Phaser.Scene {
     this.piggyZ = 0;
     this.piggyVZ = 0;
     this.isJumping = false;
+    this.waterSplashCooldown = 0;
+    this.cactusPrickCooldown = 0;
+    this.farmerPathTimer = 0;
+    this.farmerNextWaypoint = null;
 
     // Farmer speed scaled by difficulty (Easy -20%, Hard +25%)
     let speedMult = 1.0;
@@ -201,15 +205,26 @@ class GameScene extends Phaser.Scene {
   createBackground() {
     const w = this.cameras.main.width;
     const h = this.cameras.main.height;
+    const theme = this.levelData.theme || 'grass';
 
-    // Distant sky backdrop
+    // Distant sky backdrop customized by level theme
     const sky = this.add.graphics().setScrollFactor(0);
-    sky.fillGradientStyle(0x74b9ff, 0x74b9ff, 0xa1c4fd, 0xc2e9fb, 1);
+    if (theme === 'water_platforms') {
+      sky.fillGradientStyle(0x0abde3, 0x0abde3, 0x48dbfb, 0xc7ecee, 1);
+    } else if (theme === 'desert_labyrinth') {
+      sky.fillGradientStyle(0xff9f43, 0xff9f43, 0xfeca57, 0xffeaa7, 1);
+    } else if (theme === 'sky_islands') {
+      sky.fillGradientStyle(0x341f97, 0x341f97, 0x54a0ff, 0xc8d6e5, 1);
+    } else {
+      sky.fillGradientStyle(0x74b9ff, 0x74b9ff, 0xa1c4fd, 0xc2e9fb, 1);
+    }
     sky.fillRect(0, 0, Math.max(w, 2500), Math.max(h, 1500));
 
-    // Parallax Mountain Silhouettes (matching background in world tilesheet)
+    // Parallax Mountain / Dune / Cloud Silhouettes
     this.bgHills = this.add.graphics().setScrollFactor(0.08);
-    this.bgHills.fillStyle(0x3d6f46, 0.45);
+    const hillColor = theme === 'desert_labyrinth' ? 0xd35400 : (theme === 'sky_islands' ? 0xffffff : 0x3d6f46);
+    const hillAlpha = theme === 'sky_islands' ? 0.35 : 0.45;
+    this.bgHills.fillStyle(hillColor, hillAlpha);
     this.bgHills.beginPath();
     this.bgHills.moveTo(-200, 260);
     for (let x = -200; x < 2500; x += 150) {
@@ -223,13 +238,24 @@ class GameScene extends Phaser.Scene {
 
     // Silo and farm silhouettes in distance
     this.bgSilos = this.add.graphics().setScrollFactor(0.12);
-    this.bgSilos.fillStyle(0x274e2d, 0.55);
-    // Draw distant barn/silo outlines
+    const siloCol = theme === 'desert_labyrinth' ? 0x9c5f27 : (theme === 'sky_islands' ? 0x5f27cd : 0x274e2d);
+    this.bgSilos.fillStyle(siloCol, 0.45);
     [-50, 400, 900, 1500].forEach(bx => {
       this.bgSilos.fillRect(bx, 280, 50, 90);
       this.bgSilos.fillCircle(bx + 25, 280, 25);
       this.bgSilos.fillRect(bx + 60, 310, 80, 60);
     });
+  }
+
+  getTileAt(gx, gy) {
+    const gw = this.levelData.gridWidth || 12;
+    const gh = this.levelData.gridHeight || 24;
+    const ix = Phaser.Math.Clamp(Math.round(gx), 0, gw - 1);
+    const iy = Phaser.Math.Clamp(Math.round(gy), 0, gh - 1);
+    if (this.tileGrid && this.tileGrid[iy] && this.tileGrid[iy][ix]) {
+      return this.tileGrid[iy][ix];
+    }
+    return { x: ix, y: iy, tileKey: 'tile_grass', z: 0, isWater: false, isPlatform: false, isFloatingIsland: false, isVoid: false };
   }
 
   buildIsometricWorld() {
@@ -238,38 +264,73 @@ class GameScene extends Phaser.Scene {
     const pathX = this.levelData.pathX || Math.floor(gw / 2);
 
     this.gridTiles = [];
+    this.tileGrid = window.buildLevelTileGrid ? window.buildLevelTileGrid(this.levelData) : [];
+    this.platformSprites = {};
 
-    // Lay out isometric foundation
+    // Lay out isometric foundation (supporting water, jumping platforms, multi-height cubes & floating islands)
     for (let y = 0; y < gh; y++) {
       for (let x = 0; x < gw; x++) {
-        // Decide tile type: central path is dirt, surrounding is lush grass
-        const isPath = Math.abs(x - pathX) <= 1;
-        const tileKey = isPath ? 'tile_dirt' : 'tile_grass';
+        const cell = (this.tileGrid[y] && this.tileGrid[y][x]) || {
+          x, y, tileKey: Math.abs(x - pathX) <= 1 ? 'tile_dirt' : 'tile_grass',
+          z: (x === 0 || x === gw - 1) ? 1 : 0,
+          isWater: false, isPlatform: false, isFloatingIsland: false, isVoid: false
+        };
 
-        // Elevation: raised terraces on borders
-        let z = 0;
-        if (x === 0 || x === gw - 1) {
-          z = 1;
+        const baseIsoY = (x + y) * (this.tileHeight / 2);
+
+        // 1. Open sky void (between floating islands)
+        if (cell.isVoid) {
+          continue;
         }
 
-        const iso = this.gridToIso(x, y, z);
-        const tile = this.add.image(iso.x, iso.y, tileKey);
-        tile.setOrigin(0.5, 0.35);
-        tile.setDepth(iso.y - 100);
-        this.tileGroup.add(tile);
+        // 2. If this is a jumping platform over water, render the water surface underneath first!
+        if (cell.hasWaterUnderneath) {
+          const waterIso = this.gridToIso(x, y, -0.35);
+          const waterTile = this.add.image(waterIso.x, waterIso.y, 'tile_water');
+          waterTile.setOrigin(0.5, 0.35);
+          waterTile.setDepth(baseIsoY - 120);
+          this.tileGroup.add(waterTile);
+        }
+
+        // 3. If solid ground cube has height z > 0 (and not a floating island or platform), stack support cubes underneath
+        if (!cell.isPlatform && !cell.isFloatingIsland && !cell.isWater && cell.z > 0) {
+          const stackKey = cell.stackBaseKey || 'tile_dirt';
+          for (let sz = 0; sz < cell.z; sz++) {
+            const sIso = this.gridToIso(x, y, sz);
+            const sTile = this.add.image(sIso.x, sIso.y, stackKey);
+            sTile.setOrigin(0.5, 0.35);
+            sTile.setDepth(baseIsoY - 105 + sz * 2);
+            this.tileGroup.add(sTile);
+          }
+        }
+
+        // 4. Render top surface tile (ground, water, jumping platform, or floating island)
+        if (cell.tileKey) {
+          const iso = this.gridToIso(x, y, cell.z);
+          const tile = this.add.image(iso.x, iso.y, cell.tileKey);
+          tile.setOrigin(0.5, 0.35);
+          const depthOffset = cell.isWater ? -115 : (-95 + cell.z * 2);
+          tile.setDepth(baseIsoY + depthOffset);
+          this.tileGroup.add(tile);
+
+          if (cell.isPlatform) {
+            this.platformSprites[`${x},${y}`] = tile;
+          }
+        }
       }
     }
 
-    // Place Obstacles (Base + Dynamic Difficulty Obstacles)
+    // Place Obstacles (Base + Procedural Labyrinth Cactuses + Dynamic Difficulty Obstacles)
     this.obstacles = [];
-    const obsList = (this.levelData.obstacles || []).map(o => ({ ...o }));
+    const obsList = window.getLevelObstacles
+      ? window.getLevelObstacles(this.levelData)
+      : (this.levelData.obstacles || []).map(o => ({ ...o }));
 
-    // Higher Difficulty = More barriers, traps, and hazards!
-    if (this.difficulty === 'hard' && !this.levelData.isTraining) {
+    // Higher Difficulty = More barriers, traps, and hazards on standard levels!
+    if (this.difficulty === 'hard' && !this.levelData.isTraining && (!this.levelData.layoutType || this.levelData.layoutType === 'standard')) {
       const gh = this.levelData.gridHeight || 24;
       const px = this.levelData.pathX !== undefined ? this.levelData.pathX : 5;
       
-      // Inject extra alternating spikes and thorns along the escape path
       const extraRows = [6, 10, 13, 17, 20];
       extraRows.forEach((ry, idx) => {
         if (ry < gh - 3 && ry > 3) {
@@ -281,7 +342,6 @@ class GameScene extends Phaser.Scene {
         }
       });
 
-      // Inject extra slippery mud pits on Hard
       if (!obsList.some(o => o.y === 9)) {
         obsList.push({ type: 'mud', x: px, y: 9, z: 0 });
       }
@@ -291,15 +351,18 @@ class GameScene extends Phaser.Scene {
     }
 
     obsList.forEach(obs => {
-      const iso = this.gridToIso(obs.x, obs.y, obs.z || 0);
+      const oz = obs.z !== undefined ? obs.z : 0;
+      const iso = this.gridToIso(obs.x, obs.y, oz);
+      const baseIsoY = (obs.x + obs.y) * (this.tileHeight / 2);
       const sprite = this.add.image(iso.x, iso.y, obs.type);
-      sprite.setOrigin(0.5, 0.7);
-      sprite.setDepth(iso.y);
+      sprite.setOrigin(0.5, obs.type === 'cactus' ? 0.85 : 0.7);
+      sprite.setDepth(baseIsoY + oz * 2);
       this.obstacles.push({
         type: obs.type,
         gridX: obs.x,
         gridY: obs.y,
-        gridZ: obs.z || 0,
+        gridZ: oz,
+        isWall: !!obs.isWall || obs.type === 'cactus',
         sprite: sprite,
         targetZ: obs.targetZ
       });
@@ -309,10 +372,12 @@ class GameScene extends Phaser.Scene {
     // Place Collectibles
     this.items = [];
     (this.levelData.items || []).forEach(item => {
-      const iso = this.gridToIso(item.x, item.y, item.z || 0);
+      const iz = item.z !== undefined ? item.z : 0;
+      const iso = this.gridToIso(item.x, item.y, iz);
+      const baseIsoY = (item.x + item.y) * (this.tileHeight / 2);
       const sprite = this.add.image(iso.x, iso.y - 10, item.type);
       sprite.setOrigin(0.5, 0.7);
-      sprite.setDepth(iso.y + 5);
+      sprite.setDepth(baseIsoY + 6 + iz * 2);
 
       // Cute bobbing / floating animation for items
       this.tweens.add({
@@ -328,7 +393,7 @@ class GameScene extends Phaser.Scene {
         type: item.type,
         gridX: item.x,
         gridY: item.y,
-        gridZ: item.z || 0,
+        gridZ: iz,
         sprite: sprite,
         collected: false
       });
@@ -337,15 +402,17 @@ class GameScene extends Phaser.Scene {
 
     // Place Scenery (Barn Goal, Trees, Fences, Pumpkins)
     (this.levelData.scenery || []).forEach(sc => {
-      const iso = this.gridToIso(sc.x, sc.y, sc.z || 0);
+      const sz = sc.z !== undefined ? sc.z : 0;
+      const iso = this.gridToIso(sc.x, sc.y, sz);
+      const baseIsoY = (sc.x + sc.y) * (this.tileHeight / 2);
       const sprite = this.add.image(iso.x, iso.y, sc.type);
       if (sc.type === 'barn') {
         sprite.setOrigin(0.5, 0.85);
-        sprite.setDepth(iso.y + 40);
+        sprite.setDepth(baseIsoY + 40 + sz * 2);
         this.barnSprite = sprite;
       } else {
         sprite.setOrigin(0.5, 0.85);
-        sprite.setDepth(iso.y);
+        sprite.setDepth(baseIsoY + sz * 2);
       }
       this.sceneryGroup.add(sprite);
     });
@@ -382,13 +449,14 @@ class GameScene extends Phaser.Scene {
     });
 
     // Goal position
-    this.goalGrid = this.levelData.goal || { x: pathX, y: gh - 2 };
+    this.goalGrid = this.levelData.goal || { x: pathX, y: gh - 2, z: 0 };
   }
 
   createCharacters() {
     // 1. PIGGY (Hero)
     const pStart = this.levelData.piggyStart || { x: 5, y: 2, z: 0 };
-    this.piggyGrid = { x: pStart.x, y: pStart.y, z: pStart.z };
+    this.piggyGrid = { x: pStart.x, y: pStart.y, z: pStart.z || 0 };
+    this.lastSafeGrid = { x: pStart.x, y: pStart.y, z: pStart.z || 0 };
     const pigIso = this.gridToIso(this.piggyGrid.x, this.piggyGrid.y, this.piggyGrid.z);
 
     this.piggy = this.add.sprite(pigIso.x, pigIso.y, 'piggy');
@@ -537,12 +605,39 @@ class GameScene extends Phaser.Scene {
   }
 
   requestJump() {
-    if (this.isJumping || this.isGameOver || this.isVictory) return;
+    if (this.isGameOver || this.isVictory) return;
+    const curTile = this.getTileAt(this.piggyGrid.x, this.piggyGrid.y);
+    // Allow jumping if on ground/platform OR wading in water
+    if (this.isJumping && !(curTile.isWater && this.piggyZ < 0.35)) return;
+
     this.isJumping = true;
     const jMult = this.cosmeticBonuses?.jumpPowerMult || 1.0;
-    this.piggyVZ = (this.buffJump > 0 ? 10.4 : 6.2) * jMult;
-    window.sounds?.playJump();
-    this.spawnDust(this.piggy.x, this.piggy.y, this.buffJump > 0 ? 8 : 4);
+    let baseVZ = this.buffJump > 0 ? 10.8 : 7.5;
+
+    if (curTile.isPlatform) {
+      // Jumping platforms give a springy boost to clear wide water gaps and tall platforms!
+      baseVZ *= 1.18;
+      window.sounds?.playBounce();
+      const pKey = `${curTile.x},${curTile.y}`;
+      const pSprite = this.platformSprites && this.platformSprites[pKey];
+      if (pSprite) {
+        this.tweens.add({
+          targets: pSprite,
+          scaleY: 0.82,
+          duration: 90,
+          yoyo: true,
+          ease: 'Quad.easeOut'
+        });
+      }
+    } else if (curTile.isWater) {
+      baseVZ = Math.max(baseVZ, 8.4);
+      window.sounds?.playSplash();
+    } else {
+      window.sounds?.playJump();
+    }
+
+    this.piggyVZ = baseVZ * jMult;
+    this.spawnDust(this.piggy.x, this.piggy.y, this.buffJump > 0 ? 8 : 5);
   }
 
   requestDash() {
@@ -569,6 +664,9 @@ class GameScene extends Phaser.Scene {
     // Slow-motion time dilation when inventory is open (gives player time to plan abilities)
     const timeScale = this.isInventoryOpen ? 0.18 : 1.0;
     const dt = (delta / 1000) * timeScale; // in seconds (slow-mo scaled)
+
+    if (this.waterSplashCooldown > 0) this.waterSplashCooldown -= dt;
+    if (this.cactusPrickCooldown > 0) this.cactusPrickCooldown -= dt;
 
     // Update Grace Period (Head Start)
     if (this.graceTime > 0) {
@@ -665,9 +763,14 @@ class GameScene extends Phaser.Scene {
     this.handleFarmerAI(dt);
     this.handleFarmerJump(dt);
 
-    // Update Depths for Proper 2.5D Isometric Sorting
-    this.piggy.setDepth(this.piggy.y + 10);
-    this.farmer.setDepth(this.farmer.y + 10);
+    // Update Depths for Proper 2.5D Isometric Sorting across multi-height cubes & platforms
+    const pigTotalZ = (this.piggyGrid.z || 0) + (this.piggyZ || 0);
+    const pigBaseIsoY = (this.piggyGrid.x + this.piggyGrid.y) * (this.tileHeight / 2);
+    this.piggy.setDepth(pigBaseIsoY + 12 + pigTotalZ * 2);
+
+    const farmTotalZ = (this.farmerGrid.z || 0) + (this.farmerZ || 0);
+    const farmBaseIsoY = (this.farmerGrid.x + this.farmerGrid.y) * (this.tileHeight / 2);
+    this.farmer.setDepth(farmBaseIsoY + 12 + farmTotalZ * 2);
 
     // Check Collisions (Items, Obstacles, Goal)
     this.checkInteractions();
@@ -676,6 +779,41 @@ class GameScene extends Phaser.Scene {
     const distFarmer = Phaser.Math.Distance.Between(this.piggyGrid.x, this.piggyGrid.y, this.farmerGrid.x, this.farmerGrid.y);
     const distGoal = Phaser.Math.Distance.Between(this.piggyGrid.x, this.piggyGrid.y, this.goalGrid.x, this.goalGrid.y);
     this.events.emit('updateDistance', distFarmer, distGoal);
+  }
+
+  canPiggyEnter(tx, ty, totalZ) {
+    const gw = this.levelData.gridWidth || 12;
+    const gh = this.levelData.gridHeight || 24;
+    if (tx < 0.45 || tx > gw - 1.45 || ty < 0 || ty > gh - 0.85) {
+      return false;
+    }
+
+    // Check solid cactus labyrinth walls (unless vaulting high over them)
+    for (const obs of this.obstacles) {
+      if (obs.type === 'cactus') {
+        const d = Math.hypot(tx - obs.gridX, ty - obs.gridY);
+        if (d < 0.56 && totalZ < (obs.gridZ || 0) + 1.15) {
+          if (this.cactusPrickCooldown <= 0) {
+            this.cactusPrickCooldown = 0.75;
+            if (!this.cosmeticBonuses?.hazardImmune) {
+              window.sounds?.playHurt();
+              this.cameras.main.shake(100, 0.008);
+            }
+            this.showFloatingText(this.piggy.x, this.piggy.y - 38, '🌵 PRICKLY CACTUS!', '#2ecc71');
+          }
+          return false;
+        }
+      }
+    }
+
+    // Check 3D terrain step height: if target ground cube or platform is higher than Piggy's feet + step ledge tolerance
+    const targetTile = this.getTileAt(tx, ty);
+    const targetSurfaceZ = targetTile.isVoid ? -10 : (targetTile.isWater ? -0.35 : targetTile.z);
+    if (targetSurfaceZ > totalZ + 0.55) {
+      return false;
+    }
+
+    return true;
   }
 
   handlePiggyMovement(dt) {
@@ -727,6 +865,9 @@ class GameScene extends Phaser.Scene {
       this.refillDevArtifacts();
     }
 
+    const curTileBefore = this.getTileAt(this.piggyGrid.x, this.piggyGrid.y);
+    const totalZ = (this.piggyGrid.z || 0) + (this.piggyZ || 0);
+
     // Calculate movement vector
     if (dx !== 0 || dy !== 0) {
       // Normalize diagonal speed
@@ -747,21 +888,52 @@ class GameScene extends Phaser.Scene {
         }
       }
 
-      // Option 1: True Screen-Relative Isometric Movement
-      // Up (dy = -1) moves straight UP on screen
-      // Down (dy = +1) moves straight DOWN on screen
-      // Left (dx = -1) moves straight LEFT on screen
-      // Right (dx = +1) moves straight RIGHT on screen
+      // Apply Water Wading Slowdown when in water between platforms
+      if (curTileBefore.isWater && this.piggyZ < 0.25) {
+        currentSpeed *= 0.42;
+      }
+
+      // Screen-Relative Isometric Movement
       const scale = 0.55;
       const gridDeltaX = (dx + 2 * dy) * currentSpeed * scale * dt;
       const gridDeltaY = (2 * dy - dx) * currentSpeed * scale * dt;
 
-      this.piggyGrid.x += gridDeltaX;
-      this.piggyGrid.y += gridDeltaY;
+      const oldX = this.piggyGrid.x;
+      const oldY = this.piggyGrid.y;
+      const nextX = oldX + gridDeltaX;
+      const nextY = oldY + gridDeltaY;
+
+      // 3D Step & Labyrinth Wall Collision with smooth axis sliding
+      if (this.canPiggyEnter(nextX, nextY, totalZ)) {
+        this.piggyGrid.x = nextX;
+        this.piggyGrid.y = nextY;
+      } else if (this.canPiggyEnter(nextX, oldY, totalZ)) {
+        this.piggyGrid.x = nextX;
+      } else if (this.canPiggyEnter(oldX, nextY, totalZ)) {
+        this.piggyGrid.y = nextY;
+      }
 
       // Clamp within map bounds
       this.piggyGrid.x = Phaser.Math.Clamp(this.piggyGrid.x, 0.5, this.levelData.gridWidth - 1.5);
       this.piggyGrid.y = Phaser.Math.Clamp(this.piggyGrid.y, 0, this.levelData.gridHeight - 1);
+
+      // Resolve new ground elevation beneath Piggy
+      const newTile = this.getTileAt(this.piggyGrid.x, this.piggyGrid.y);
+      const newGroundZ = newTile.isVoid ? -10 : (newTile.isWater ? -0.35 : newTile.z);
+
+      if (totalZ > newGroundZ + 0.04) {
+        // Airborne above the new tile (either mid-jump or walked off a higher cube/platform)
+        this.piggyGrid.z = newGroundZ;
+        this.piggyZ = totalZ - newGroundZ;
+        this.isJumping = true;
+      } else {
+        // Stepped onto the new tile surface
+        this.piggyGrid.z = newGroundZ;
+        this.piggyZ = 0;
+        if (!newTile.isWater && !newTile.isVoid) {
+          this.lastSafeGrid = { x: this.piggyGrid.x, y: this.piggyGrid.y, z: newGroundZ };
+        }
+      }
 
       // Facing based on screen direction
       if (dx > 0) this.piggy.setFlipX(false);
@@ -792,11 +964,57 @@ class GameScene extends Phaser.Scene {
     this.piggyZ += this.piggyVZ * dt;
     this.piggyVZ -= 16.0 * dt; // gravity
 
+    const curTile = this.getTileAt(this.piggyGrid.x, this.piggyGrid.y);
+    const totalZ = (this.piggyGrid.z || 0) + this.piggyZ;
+
+    // Check if Piggy fell into the open sky chasm around Floating Islands
+    if (curTile.isVoid && totalZ < -0.5) {
+      window.sounds?.playHurt();
+      this.cameras.main.shake(180, 0.014);
+      const safe = this.lastSafeGrid || this.levelData.piggyStart || { x: 7, y: 2, z: 0 };
+      this.piggyGrid.x = safe.x;
+      this.piggyGrid.y = safe.y;
+      this.piggyGrid.z = safe.z || 0;
+      this.piggyZ = 0.6;
+      this.piggyVZ = 2.5;
+      this.isJumping = true;
+      const iso = this.gridToIso(this.piggyGrid.x, this.piggyGrid.y, this.piggyGrid.z + this.piggyZ);
+      this.piggy.x = iso.x;
+      this.piggy.y = iso.y;
+      this.showFloatingText(iso.x, iso.y - 40, '☁️ RESCUED FROM SKY CHASM!', '#48dbfb');
+      return;
+    }
+
     if (this.piggyZ <= 0) {
       this.piggyZ = 0;
       this.piggyVZ = 0;
       this.isJumping = false;
-      this.spawnDust(this.piggy.x, this.piggy.y, 4);
+
+      if (curTile.isWater) {
+        if (this.waterSplashCooldown <= 0) {
+          this.waterSplashCooldown = 1.2;
+          window.sounds?.playSplash();
+          this.showFloatingText(this.piggy.x, this.piggy.y - 34, '💧 SPLASH! JUMP TO PLATFORM!', '#48dbfb');
+        }
+        this.spawnDust(this.piggy.x, this.piggy.y, 5);
+      } else {
+        this.lastSafeGrid = { x: this.piggyGrid.x, y: this.piggyGrid.y, z: curTile.z || 0 };
+        this.spawnDust(this.piggy.x, this.piggy.y, 4);
+
+        if (curTile.isPlatform) {
+          const pKey = `${curTile.x},${curTile.y}`;
+          const pSprite = this.platformSprites && this.platformSprites[pKey];
+          if (pSprite) {
+            this.tweens.add({
+              targets: pSprite,
+              scaleY: 0.88,
+              duration: 80,
+              yoyo: true,
+              ease: 'Quad.easeOut'
+            });
+          }
+        }
+      }
     }
   }
 
@@ -815,6 +1033,70 @@ class GameScene extends Phaser.Scene {
     if (this.farmerJumpCooldown > 0) {
       this.farmerJumpCooldown -= dt;
     }
+  }
+
+  // Lightweight BFS grid pathfinder so Farmer navigates Cactus Labyrinth corridors intelligently
+  getNextLabyrinthStep(fromX, fromY, toX, toY) {
+    const gw = this.levelData.gridWidth || 15;
+    const gh = this.levelData.gridHeight || 30;
+    const sx = Phaser.Math.Clamp(Math.round(fromX), 1, gw - 2);
+    const sy = Phaser.Math.Clamp(Math.round(fromY), 0, gh - 1);
+    const tx = Phaser.Math.Clamp(Math.round(toX), 1, gw - 2);
+    const ty = Phaser.Math.Clamp(Math.round(toY), 0, gh - 1);
+
+    if (sx === tx && sy === ty) return { x: toX, y: toY };
+
+    const blocked = new Set();
+    for (const obs of this.obstacles) {
+      if (obs.type === 'cactus') {
+        blocked.add(`${Math.round(obs.gridX)},${Math.round(obs.gridY)}`);
+      }
+    }
+
+    const queue = [{ x: sx, y: sy, firstStep: null }];
+    const visited = new Set([`${sx},${sy}`]);
+    const dirs = [
+      [0, 1], [1, 0], [-1, 0], [0, -1],
+      [1, 1], [-1, 1], [1, -1], [-1, -1]
+    ];
+
+    let closestStep = null;
+    let closestDist = Infinity;
+
+    while (queue.length > 0) {
+      const cur = queue.shift();
+      if (cur.x === tx && cur.y === ty) {
+        return cur.firstStep || { x: toX, y: toY };
+      }
+
+      const dToTarget = Math.hypot(cur.x - tx, cur.y - ty);
+      if (cur.firstStep && dToTarget < closestDist) {
+        closestDist = dToTarget;
+        closestStep = cur.firstStep;
+      }
+
+      for (const [dx, dy] of dirs) {
+        const nx = cur.x + dx;
+        const ny = cur.y + dy;
+        const key = `${nx},${ny}`;
+        if (nx >= 1 && nx <= gw - 2 && ny >= 0 && ny < gh && !visited.has(key) && !blocked.has(key)) {
+          // Prevent diagonal corner-cutting through two adjacent cactus walls
+          if (dx !== 0 && dy !== 0) {
+            if (blocked.has(`${cur.x + dx},${cur.y}`) || blocked.has(`${cur.x},${cur.y + dy}`)) {
+              continue;
+            }
+          }
+          visited.add(key);
+          queue.push({
+            x: nx,
+            y: ny,
+            firstStep: cur.firstStep || { x: nx, y: ny }
+          });
+        }
+      }
+    }
+
+    return closestStep || { x: toX, y: toY };
   }
 
   handleFarmerAI(dt) {
@@ -845,14 +1127,13 @@ class GameScene extends Phaser.Scene {
 
     const isAirborne = this.isFarmerJumping && this.farmerZ > 0.35;
 
-    // Hazard Injury Check: Did the farmer hit spikes or thorns/cactus?
-    // If airborne, farmer vaults cleanly over the hazard safely!
+    // Hazard Injury Check: Did the farmer hit spikes or thorns?
     if (!isAirborne) {
       for (const obs of this.obstacles) {
         if (obs.type === 'spikes' || obs.type === 'thorn') {
           const d = Math.hypot(this.farmerGrid.x - obs.gridX, this.farmerGrid.y - obs.gridY);
           if (d < 0.65) {
-            this.injureFarmer(obs.type === 'spikes' ? 'SPIKES' : 'CACTUS');
+            this.injureFarmer(obs.type === 'spikes' ? 'SPIKES' : 'THORNS');
             return;
           }
         }
@@ -860,13 +1141,13 @@ class GameScene extends Phaser.Scene {
     }
 
     // Target Selection: Decoy Clone vs Real Piggy
-    let targetX = this.piggyGrid.x;
-    let targetY = this.piggyGrid.y;
+    let goalTargetX = this.piggyGrid.x;
+    let goalTargetY = this.piggyGrid.y;
     let isTargetingClone = false;
 
     if (this.buffClone > 0 && this.cloneGrid) {
-      targetX = this.cloneGrid.x;
-      targetY = this.cloneGrid.y;
+      goalTargetX = this.cloneGrid.x;
+      goalTargetY = this.cloneGrid.y;
       isTargetingClone = true;
     } else if (this.buffInvis > 0) {
       // Invisibility Active: Farmer cannot see Piggy!
@@ -879,35 +1160,72 @@ class GameScene extends Phaser.Scene {
       return;
     }
 
-    // Distance from farmer to target
-    const dx = targetX - this.farmerGrid.x;
-    const dy = targetY - this.farmerGrid.y;
+    let steerX = goalTargetX;
+    let steerY = goalTargetY;
+
+    // In Cactus Labyrinth, navigate around cactus maze walls using BFS waypoint steering
+    if (this.levelData.layoutType === 'cactus_labyrinth' && this.farmerGrid.y >= 2) {
+      this.farmerPathTimer -= dt;
+      if (this.farmerPathTimer <= 0 || !this.farmerNextWaypoint) {
+        this.farmerPathTimer = 0.22;
+        this.farmerNextWaypoint = this.getNextLabyrinthStep(this.farmerGrid.x, this.farmerGrid.y, goalTargetX, goalTargetY);
+      }
+      if (this.farmerNextWaypoint) {
+        steerX = this.farmerNextWaypoint.x;
+        steerY = this.farmerNextWaypoint.y;
+      }
+    }
+
+    // Distance to immediate steering point vs actual target
+    const sdx = steerX - this.farmerGrid.x;
+    const sdy = steerY - this.farmerGrid.y;
+    const steerDist = Math.hypot(sdx, sdy);
+
+    const dx = goalTargetX - this.farmerGrid.x;
+    const dy = goalTargetY - this.farmerGrid.y;
     const dist = Math.hypot(dx, dy);
 
     // ========================================================
-    // HARD MODE: Farmer leaps over upcoming obstacles in his path!
+    // Farmer Leaps across Water Gaps, Sky Chasms, Elevation Steps & Hard Mode Obstacles
     // ========================================================
-    if (this.difficulty === 'hard' && !this.isFarmerJumping && this.farmerJumpCooldown <= 0 && dist > 0.4) {
-      const moveDirX = dx / dist;
-      const moveDirY = dy / dist;
+    const curFarmerTile = this.getTileAt(this.farmerGrid.x, this.farmerGrid.y);
+    if (!this.isFarmerJumping && this.farmerJumpCooldown <= 0 && steerDist > 0.25) {
+      const moveDirX = sdx / steerDist;
+      const moveDirY = sdy / steerDist;
+      const lookAheadTile = this.getTileAt(this.farmerGrid.x + moveDirX * 1.1, this.farmerGrid.y + moveDirY * 1.1);
 
-      for (const obs of this.obstacles) {
-        if (obs.type === 'spikes' || obs.type === 'thorn' || obs.type === 'mud' || obs.type === 'hay_spring') {
-          const toObsX = obs.gridX - this.farmerGrid.x;
-          const toObsY = obs.gridY - this.farmerGrid.y;
-          const obsDist = Math.hypot(toObsX, toObsY);
+      let shouldJump = false;
+      let jumpLabel = null;
 
-          // Dot product: checks if obstacle is along the farmer's heading
-          const dot = toObsX * moveDirX + toObsY * moveDirY;
-          if (obsDist < 1.45 && dot > 0.35) {
-            this.isFarmerJumping = true;
-            this.farmerVZ = 7.8; // High athletic leap
-            this.farmerJumpCooldown = 1.35;
-            window.sounds?.playJump();
-            this.spawnDust(this.farmer.x, this.farmer.y, 5);
-            this.showFloatingText(this.farmer.x, this.farmer.y - 42, '🦘 VAULT!', '#ff4757');
-            break;
+      // Jump across water, sky void, or up onto higher platforms/cubes
+      if (lookAheadTile.isWater || lookAheadTile.isVoid || lookAheadTile.z > (this.farmerGrid.z || 0) + 0.3) {
+        shouldJump = true;
+      }
+
+      if (!shouldJump && this.difficulty === 'hard') {
+        for (const obs of this.obstacles) {
+          if (obs.type === 'spikes' || obs.type === 'thorn' || obs.type === 'mud' || obs.type === 'hay_spring') {
+            const toObsX = obs.gridX - this.farmerGrid.x;
+            const toObsY = obs.gridY - this.farmerGrid.y;
+            const obsDist = Math.hypot(toObsX, toObsY);
+            const dot = toObsX * moveDirX + toObsY * moveDirY;
+            if (obsDist < 1.45 && dot > 0.35) {
+              shouldJump = true;
+              jumpLabel = '🦘 VAULT!';
+              break;
+            }
           }
+        }
+      }
+
+      if (shouldJump) {
+        this.isFarmerJumping = true;
+        this.farmerVZ = 7.8;
+        this.farmerJumpCooldown = 1.15;
+        window.sounds?.playJump();
+        this.spawnDust(this.farmer.x, this.farmer.y, 5);
+        if (jumpLabel) {
+          this.showFloatingText(this.farmer.x, this.farmer.y - 42, jumpLabel, '#ff4757');
         }
       }
     }
@@ -915,18 +1233,23 @@ class GameScene extends Phaser.Scene {
     // Speed calculation
     let speed = (this.farmerSpeed / 30); // scale to grid units/sec
 
-    // Mud check for Farmer (only if not jumping over it)
-    if (this.isEntityOnMud(this.farmerGrid.x, this.farmerGrid.y) && !isAirborne) {
-      speed *= 0.45;
+    // Mud or Water slowdown for Farmer (if not airborne)
+    if (!isAirborne && (this.isEntityOnMud(this.farmerGrid.x, this.farmerGrid.y) || curFarmerTile.isWater)) {
+      speed *= 0.48;
     }
 
     // Farmer tracks target
-    if (dist > 0.3) {
-      const dirX = dx / dist;
-      const dirY = dy / dist;
+    if (steerDist > 0.15) {
+      const dirX = sdx / steerDist;
+      const dirY = sdy / steerDist;
 
       this.farmerGrid.x += dirX * speed * dt;
       this.farmerGrid.y += dirY * speed * dt;
+
+      // Update Farmer base elevation smoothly to match terrain
+      const fTile = this.getTileAt(this.farmerGrid.x, this.farmerGrid.y);
+      const targetGroundZ = fTile.isVoid ? Math.max(0, this.farmerGrid.z || 0) : (fTile.isWater ? -0.35 : fTile.z);
+      this.farmerGrid.z = Phaser.Math.Linear(this.farmerGrid.z || 0, targetGroundZ, Math.min(1, dt * 8));
 
       // Facing
       if (dirX > 0) {
@@ -945,11 +1268,10 @@ class GameScene extends Phaser.Scene {
 
       // Pitchfork thrust effect follows farmer
       if (this.pitchforkGlow) {
-        this.pitchforkGlow.setDepth(this.farmer.y + 2);
+        this.pitchforkGlow.setDepth(this.farmer.depth + 2);
       }
 
       if (isAirborne) {
-        // Dynamic forward athletic tilt while leaping
         this.farmer.setAngle((this.farmerFacing || 1) * 14);
       }
     }
@@ -963,11 +1285,12 @@ class GameScene extends Phaser.Scene {
 
     // Pitchfork Warning Lunge vs Catch (Only if real Piggy and not invisible)
     if (!isTargetingClone && this.buffInvis <= 0) {
-      const zDiff = Math.abs(this.farmerZ - (this.piggyZ || 0));
-      if (dist < 0.55 && zDiff < 0.85) {
+      const pigTotalZ = (this.piggyGrid.z || 0) + (this.piggyZ || 0);
+      const farmTotalZ = (this.farmerGrid.z || 0) + (this.farmerZ || 0);
+      const zDiff = Math.abs(farmTotalZ - pigTotalZ);
+      if (dist < 0.55 && zDiff < 1.1) {
         this.triggerGameOver('The farmer caught Piggy with his pitchfork!');
       } else if (dist < 1.2 && !isAirborne) {
-        // Pitchfork thrust warning: farmer angles towards piggy
         this.farmer.setAngle(this.farmer.flipX ? -15 : 15);
         if (Math.random() < 0.04) {
           window.sounds?.playFarmerAlert();
@@ -993,11 +1316,14 @@ class GameScene extends Phaser.Scene {
   }
 
   checkInteractions() {
-    // 1. Collectibles & Artifacts Check
+    const pigTotalZ = (this.piggyGrid.z || 0) + (this.piggyZ || 0);
+
+    // 1. Collectibles & Artifacts Check (including elevated platforms & floating islands)
     for (const item of this.items) {
       if (!item.collected) {
         const d = Math.hypot(this.piggyGrid.x - item.gridX, this.piggyGrid.y - item.gridY);
-        if (d < 0.85) {
+        const zDiff = Math.abs(pigTotalZ - (item.gridZ || 0));
+        if (d < 0.9 && zDiff < 1.4) {
           if (item.type.startsWith('artifact_')) {
             item.collected = true;
             window.sounds?.playPowerup();
@@ -1062,13 +1388,14 @@ class GameScene extends Phaser.Scene {
     // 2. Obstacles Check (Spikes & Hay Spring & Thorns)
     for (const obs of this.obstacles) {
       const d = Math.hypot(this.piggyGrid.x - obs.gridX, this.piggyGrid.y - obs.gridY);
-      if (d < 0.7) {
-        if (obs.type === 'hay_spring' && !this.isJumping) {
+      const zDiff = Math.abs(pigTotalZ - (obs.gridZ || 0));
+      if (d < 0.72 && zDiff < 0.9) {
+        if (obs.type === 'hay_spring' && this.piggyVZ <= 0.5) {
           // Launch Piggy high! (boosted by Spring Cleats)
           window.sounds?.playBounce();
           this.isJumping = true;
           const sMult = this.cosmeticBonuses?.springBoostMult || 1.0;
-          this.piggyVZ = 8.5 * sMult; // mega jump
+          this.piggyVZ = 9.2 * sMult; // mega jump
           this.spawnDust(this.piggy.x, this.piggy.y, 8);
           // Spring squash and stretch tween
           this.tweens.add({
@@ -1097,7 +1424,7 @@ class GameScene extends Phaser.Scene {
 
     // 3. Goal Reached Check (The Red Barn)
     const goalDist = Math.hypot(this.piggyGrid.x - this.goalGrid.x, this.piggyGrid.y - this.goalGrid.y);
-    if (goalDist < 1.3) {
+    if (goalDist < 1.35) {
       this.triggerVictory();
     }
   }
@@ -1185,18 +1512,20 @@ class GameScene extends Phaser.Scene {
     }
     const gx = Math.round(this.piggyGrid.x);
     const gy = Math.round(this.piggyGrid.y);
-    const iso = this.gridToIso(gx, gy, 0);
+    const gz = Math.max(0, this.piggyGrid.z || 0);
+    const iso = this.gridToIso(gx, gy, gz);
+    const baseIsoY = (gx + gy) * (this.tileHeight / 2);
 
     const mudSprite = this.add.image(iso.x, iso.y, 'mud');
     mudSprite.setOrigin(0.5, 0.7);
-    mudSprite.setDepth(iso.y - 1);
+    mudSprite.setDepth(baseIsoY + gz * 2 - 1);
     this.obstaclesGroup.add(mudSprite);
 
     this.obstacles.push({
       type: 'mud',
       gridX: gx,
       gridY: gy,
-      gridZ: 0,
+      gridZ: gz,
       sprite: mudSprite
     });
 
